@@ -71,6 +71,23 @@ contract ViralFeeSplitterTest is Test {
         assertEq(creatorAmount + rewardsAmount + operationsAmount + buybackAmount, 101);
     }
 
+    function testTinyNativeAmountDoesNotRevertWhenProtocolSharesRoundToZero() external {
+        splitter.splitNative{value: 1}(creator, 100, 0);
+
+        assertEq(escrow.balanceOf(creator), 1);
+        assertEq(address(operations).balance, 0);
+        assertEq(address(buyback).balance, 0);
+    }
+
+    function testTinyTokenAmountDoesNotRevertWhenProtocolSharesRoundToZero() external {
+        token.mint(address(this), 1);
+        token.approve(address(splitter), 1);
+        splitter.splitToken(creator, address(token), 1, 100, 0);
+
+        assertEq(escrow.balanceOfToken(creator, address(token)), 1);
+        assertEq(token.balanceOf(address(splitter)), 0);
+    }
+
     function testOnlyLockerMaySplit() external {
         vm.deal(outsider, 1 ether);
         vm.prank(outsider);

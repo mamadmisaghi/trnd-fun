@@ -110,8 +110,8 @@ contract ViralFeeSplitter is Ownable2Step, ReentrancyGuard {
         (uint256 creatorAmount, uint256 rewardsAmount, uint256 operationsAmount, uint256 buybackAmount) =
             _allocations(msg.value, baseFeeBps, creatorFeeBps);
 
-        creatorEscrow.credit{value: creatorAmount}(creator);
-        rewardVault.fundCurrentEpoch{value: rewardsAmount}();
+        if (creatorAmount != 0) creatorEscrow.credit{value: creatorAmount}(creator);
+        if (rewardsAmount != 0) rewardVault.fundCurrentEpoch{value: rewardsAmount}();
         _sendNative(operationsVault, operationsAmount);
         _sendNative(buybackVault, buybackAmount);
 
@@ -145,12 +145,16 @@ contract ViralFeeSplitter is Ownable2Step, ReentrancyGuard {
         (uint256 creatorAmount, uint256 rewardsAmount, uint256 operationsAmount, uint256 buybackAmount) =
             _allocations(amount, baseFeeBps, creatorFeeBps);
 
-        asset.forceApprove(address(creatorEscrow), creatorAmount);
-        creatorEscrow.creditToken(creator, token, creatorAmount);
+        if (creatorAmount != 0) {
+            asset.forceApprove(address(creatorEscrow), creatorAmount);
+            creatorEscrow.creditToken(creator, token, creatorAmount);
+        }
 
-        asset.forceApprove(address(rewardVault), rewardsAmount);
-        (, uint256 rewardReceived) = rewardVault.fundCurrentEpochToken(token, rewardsAmount);
-        if (rewardReceived != rewardsAmount) revert InexactTransfer(token, rewardsAmount, rewardReceived);
+        if (rewardsAmount != 0) {
+            asset.forceApprove(address(rewardVault), rewardsAmount);
+            (, uint256 rewardReceived) = rewardVault.fundCurrentEpochToken(token, rewardsAmount);
+            if (rewardReceived != rewardsAmount) revert InexactTransfer(token, rewardsAmount, rewardReceived);
+        }
 
         _transferExact(asset, token, operationsVault, operationsAmount);
         _transferExact(asset, token, buybackVault, buybackAmount);

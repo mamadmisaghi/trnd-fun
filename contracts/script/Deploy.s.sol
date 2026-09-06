@@ -23,6 +23,10 @@ import {PairPadPositionMinter} from "../src/v2/PairPadPositionMinter.sol";
 import {PairPadLaunchDeployer} from "../src/v2/PairPadLaunchDeployer.sol";
 import {PairPadRouter, ISwapRouter02, IWETH9} from "../src/v2/PairPadRouter.sol";
 import {IPairPadFeeEscrow} from "../src/v2/interfaces/ILaunchpadV2.sol";
+import {ViralRewardVault} from "../src/viral/ViralRewardVault.sol";
+import {ViralFeeSplitter, IViralCreatorEscrow, IViralRewardFunder} from "../src/viral/ViralFeeSplitter.sol";
+import {ViralTreasuryVault} from "../src/viral/ViralTreasuryVault.sol";
+import {ViralPairRegistry} from "../src/viral/ViralPairRegistry.sol";
 
 /**
  * @notice Deploys and wires the full PairPad stack against an existing
@@ -74,16 +78,27 @@ contract Deploy is Script {
         // 1. Shared claimable-fee ledger.
         PairPadFeeEscrow feeEscrow = new PairPadFeeEscrow();
 
+        // ViralTerminal's protocol allocations are held separately and never
+        // swapped or burned during routine LP-fee collection.
+        ViralRewardVault rewardVault = new ViralRewardVault(owner, owner, owner);
+        ViralTreasuryVault operationsVault = new ViralTreasuryVault(owner);
+        ViralTreasuryVault buybackVault = new ViralTreasuryVault(owner);
+        ViralPairRegistry pairRegistry = new ViralPairRegistry(owner);
+        ViralFeeSplitter feeSplitter = new ViralFeeSplitter(
+            owner,
+            IViralCreatorEscrow(address(feeEscrow)),
+            IViralRewardFunder(address(rewardVault)),
+            address(operationsVault),
+            address(buybackVault)
+        );
+
         // 2. Spot pricer for permissionless quote assets (V3 pools, hookless
         //    V4 pools, and V4 pools found through launchpad registries).
-        PairPadQuotePricer quotePricer = new PairPadQuotePricer(
-            owner, IUniswapV3FactoryMinimal(v3Factory), weth, usdg, IPoolManager(poolManager)
-        );
+        PairPadQuotePricer quotePricer =
+            new PairPadQuotePricer(owner, IUniswapV3FactoryMinimal(v3Factory), weth, usdg, IPoolManager(poolManager));
         if (block.chainid == 4663) {
             quotePricer.setV4HookAllowed(PONS_HOOK, true);
-            quotePricer.addRegistry(
-                new PonsReferenceRegistry(IPonsV2LaunchFactory(PONS_FACTORY), IHooks(PONS_HOOK))
-            );
+            quotePricer.addRegistry(new PonsReferenceRegistry(IPonsV2LaunchFactory(PONS_FACTORY), IHooks(PONS_HOOK)));
         }
 
         // 3. Permanent position locker, which also collects the LP fees.
@@ -114,6 +129,12 @@ contract Deploy is Script {
         //    accepts by default, so they may serve as quotes for later launches.
         quotePricer.addRegistry(new PairPadReferenceRegistry(IPairPadFactoryPoolKeys(address(factory))));
         locker.setFactory(address(factory));
+        locker.setFeeSplitter(address(feeSplitter));
+        feeSplitter.setLocker(address(locker));
+        rewardVault.setFunder(address(feeSplitter));
+        pairRegistry.setPair(address(0), ViralPairRegistry.PairType.NATIVE, 18, true);
+        pairRegistry.setPair(usdg, ViralPairRegistry.PairType.STABLE, 6, true);
+        factory.setPairRegistry(address(pairRegistry));
         factory.setPositionMinter(minter);
         factory.setLaunchDeployer(launchDeployer);
         factory.setLaunchForwarder(address(router));
@@ -135,8 +156,13 @@ contract Deploy is Script {
             factory.transferOwnership(finalOwner);
             quotePricer.transferOwnership(finalOwner);
             locker.transferOwnership(finalOwner);
+            feeSplitter.transferOwnership(finalOwner);
+            rewardVault.transferOwnership(finalOwner);
+            operationsVault.transferOwnership(finalOwner);
+            buybackVault.transferOwnership(finalOwner);
+            pairRegistry.transferOwnership(finalOwner);
             console2.log("Ownership transfer started to:", finalOwner);
-            console2.log("FINAL_OWNER must call acceptOwnership() on factory, pricer, locker.");
+            console2.log("FINAL_OWNER must accept ownership on every owned protocol contract.");
         }
 
         vm.stopBroadcast();
@@ -148,5 +174,10 @@ contract Deploy is Script {
         console2.log("PairPadPositionMinter:   ", address(minter));
         console2.log("PairPadLaunchDeployer:   ", address(launchDeployer));
         console2.log("PairPadRouter:           ", address(router));
+        console2.log("ViralFeeSplitter:        ", address(feeSplitter));
+        console2.log("ViralRewardVault:        ", address(rewardVault));
+        console2.log("ViralOperationsVault:    ", address(operationsVault));
+        console2.log("ViralBuybackVault:       ", address(buybackVault));
+        console2.log("ViralPairRegistry:       ", address(pairRegistry));
     }
 }

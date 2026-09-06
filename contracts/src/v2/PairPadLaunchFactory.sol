@@ -23,6 +23,10 @@ import {PairPadQuotePricer} from "./PairPadQuotePricer.sol";
 import {PairPadPositionMath} from "./libraries/PairPadPositionMath.sol";
 import {IPairPadFeeEscrow, IPairPadLaunchFactory} from "./interfaces/ILaunchpadV2.sol";
 
+interface IViralPairRegistry {
+    function isEnabled(address asset) external view returns (bool);
+}
+
 /**
  * @title PairPadLaunchFactory
  * @notice Deploys a launch token and, in the same transaction, opens its
@@ -131,6 +135,7 @@ contract PairPadLaunchFactory is Ownable2Step, ReentrancyGuard, IPairPadLaunchFa
     error PairTokenEconomicsInvalid();
     error PairTokenDecimalsMismatch(uint8 expected, uint8 actual);
     error PairTokenDecimalsUnavailable();
+    error PairNotEnabled(address pairToken);
     error LaunchEconomicsMismatch(bytes32 expected, bytes32 actual);
     /// @dev Someone initialized this exact pool key ahead of the launch. Pick
     /// a different salt; the token address, and with it the key, changes.
@@ -182,6 +187,7 @@ contract PairPadLaunchFactory is Ownable2Step, ReentrancyGuard, IPairPadLaunchFa
     event LaunchForwarderSet(address forwarder);
     event PairTokenEconomicsUpdated(address indexed pairToken, uint256 phantomQuote, uint8 decimals);
     event PairTokenEconomicsCleared(address indexed pairToken);
+    event PairRegistrySet(address indexed pairRegistry);
 
     IPoolManager public immutable poolManager;
     IPositionManager public immutable positionManager;
@@ -194,6 +200,7 @@ contract PairPadLaunchFactory is Ownable2Step, ReentrancyGuard, IPairPadLaunchFa
     PairPadPositionMinter public positionMinter;
     PairPadLaunchDeployer public launchDeployer;
     address public launchForwarder;
+    IViralPairRegistry public pairRegistry;
 
     // Fee terms new launches snapshot. Changing them never touches a pool
     // that already exists: the LP fee is part of its key.
@@ -328,10 +335,7 @@ contract PairPadLaunchFactory is Ownable2Step, ReentrancyGuard, IPairPadLaunchFa
      * checked against the asset's own report so an 18-decimal configuration
      * can never land on a 6-decimal asset.
      */
-    function setPairTokenEconomics(address pairToken, uint256 phantomQuote, uint8 expectedDecimals)
-        external
-        onlyOwner
-    {
+    function setPairTokenEconomics(address pairToken, uint256 phantomQuote, uint8 expectedDecimals) external onlyOwner {
         if (pairToken == address(0) || phantomQuote == 0) revert PairTokenEconomicsInvalid();
         // Fees are integer basis points of the quote leg; below six decimals
         // small trades would round their fee to zero.
@@ -405,6 +409,16 @@ contract PairPadLaunchFactory is Ownable2Step, ReentrancyGuard, IPairPadLaunchFa
         if (forwarder == address(0)) revert ZeroAddress();
         launchForwarder = forwarder;
         emit LaunchForwarderSet(forwarder);
+    }
+
+    /// @notice One-time ViralTerminal quote-asset gate. Legacy baseline
+    /// deployments may leave it unset; every ViralTerminal deployment wires it
+    /// before public launch is enabled.
+    function setPairRegistry(address pairRegistry_) external onlyOwner {
+        if (address(pairRegistry) != address(0)) revert AlreadySet();
+        if (pairRegistry_ == address(0)) revert ZeroAddress();
+        pairRegistry = IViralPairRegistry(pairRegistry_);
+        emit PairRegistrySet(pairRegistry_);
     }
 
     /**
@@ -482,6 +496,9 @@ contract PairPadLaunchFactory is Ownable2Step, ReentrancyGuard, IPairPadLaunchFa
         if (bytes(params.name).length == 0 || bytes(params.symbol).length == 0) revert InvalidTokenParams();
         if (params.creatorTaxBps > maxCreatorTaxBps) revert CreatorTaxTooHigh();
         if (baseFeeBps + params.creatorTaxBps > MAX_TOTAL_TRADE_FEE_BPS) revert CombinedFeeTooHigh();
+        if (address(pairRegistry) != address(0) && !pairRegistry.isEnabled(pairToken)) {
+            revert PairNotEnabled(pairToken);
+        }
 
         LaunchConfig memory config = _launchConfigs[launchConfigId];
         if (!config.enabled) revert LaunchConfigDisabled();
@@ -553,9 +570,7 @@ contract PairPadLaunchFactory is Ownable2Step, ReentrancyGuard, IPairPadLaunchFa
         _payLaunchFee();
 
         emit TokenLaunched(token, PoolId.unwrap(poolId), originalDeployer, pairToken, launchConfigId, poolFee);
-        emit LaunchPositionMinted(
-            token, positionId, p.tickLower, p.tickUpper, p.liquidity, tokenAmount, phantomQuote
-        );
+        emit LaunchPositionMinted(token, positionId, p.tickLower, p.tickUpper, p.liquidity, tokenAmount, phantomQuote);
     }
 
     // ---------------------------------------------------------------------
@@ -668,9 +683,7 @@ contract PairPadLaunchFactory is Ownable2Step, ReentrancyGuard, IPairPadLaunchFa
      * buying: the curve's shape, the pool's tick spacing and the fee terms.
      */
     function _economicsDigest(LaunchConfig memory config, uint256 phantomQuote) private view returns (bytes32) {
-        return keccak256(
-            abi.encode(phantomQuote, config.supply, config.tickSpacing, baseFeeBps, protocolFeeShareBps)
-        );
+        return keccak256(abi.encode(phantomQuote, config.supply, config.tickSpacing, baseFeeBps, protocolFeeShareBps));
     }
 
     /**
@@ -708,11 +721,7 @@ contract PairPadLaunchFactory is Ownable2Step, ReentrancyGuard, IPairPadLaunchFa
             ? (Currency.wrap(pairToken), Currency.wrap(token))
             : (Currency.wrap(token), Currency.wrap(pairToken));
         return PoolKey({
-            currency0: currency0,
-            currency1: currency1,
-            fee: fee,
-            tickSpacing: tickSpacing,
-            hooks: IHooks(address(0))
+            currency0: currency0, currency1: currency1, fee: fee, tickSpacing: tickSpacing, hooks: IHooks(address(0))
         });
     }
 

@@ -19,18 +19,23 @@ publish fee behavior that does not match the product specification.
 - Implemented separate multisig-owned operations and buyback treasury vaults.
 - Added native ETH and ERC-20 split tests, authorization tests, and exact
   rounding-conservation coverage.
-- Unit-test status: 50 passed, 0 failed.
+- Wired the splitter into the permanent-liquidity locker.
+- Added a curated, versioned pair registry and factory launch gate.
+- Added an automated GitHub testnet preflight that validates the deployer,
+  chain ID, gas balance, and external Uniswap contract bytecode without
+  exposing the private key.
+- Unit-test status: 55 passed, 0 failed.
 
 ## Required before testnet broadcast
 
-1. Wire `ViralFeeSplitter` into the permanent liquidity locker.
-2. Snapshot the ViralTerminal fee terms in every launch record.
-3. Add the curated pair registry for ETH, test USDG, and test RWA assets.
-4. Replace remaining PairPad names and PAR/PONS-specific assumptions.
-5. Add fuzz and invariant coverage for fee conservation and claims.
-6. Confirm the live Uniswap v4 PoolManager and PositionManager addresses on
+1. Snapshot the final ViralTerminal fee terms in every launch record.
+2. Load faucet RWA assets into the curated pair registry with explicit launch
+   economics for testnet.
+3. Replace remaining PairPad names and PAR/PONS-specific assumptions.
+4. Add fuzz and invariant coverage for fee conservation and claims.
+5. Confirm the live Uniswap v4 PoolManager and PositionManager addresses on
    Robinhood Chain testnet and verify deployed bytecode at those addresses.
-7. Add a deterministic testnet deployment manifest and post-deploy assertions.
+6. Add a deterministic testnet deployment manifest and post-deploy assertions.
 
 ## Robinhood Chain testnet
 
@@ -49,4 +54,3 @@ phrase or private key into chat, an issue, source code, or Git. Load the key onl
 as a local secret environment variable. Protocol ownership and treasury roles
 must use separate test addresses during rehearsal and a multisig before any
 mainnet release.
-

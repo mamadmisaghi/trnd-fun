@@ -28,6 +28,12 @@ interface IPairPadLaunchFactoryView is IPairPadLaunchFactory {
     function poolKeyFor(address token) external view returns (PoolKey memory);
 }
 
+interface IViralFeeSplitter {
+    function splitNative(address creator, uint16 baseFeeBps, uint16 creatorFeeBps) external payable;
+    function splitToken(address creator, address token, uint256 amount, uint16 baseFeeBps, uint16 creatorFeeBps)
+        external;
+}
+
 /**
  * @title PairPadLaunchLocker
  * @notice Permanently holds the Uniswap V4 position NFT that is every PairPad
@@ -58,6 +64,7 @@ contract PairPadLaunchLocker is Ownable2Step, ReentrancyGuard, IERC721ReceiverLi
 
     error NotFactory();
     error AlreadyInitialized();
+    error FeeSplitterAlreadySet();
     error ZeroAddress();
     error PositionAlreadyLocked();
     error PositionNotHeld();
@@ -67,6 +74,7 @@ contract PairPadLaunchLocker is Ownable2Step, ReentrancyGuard, IERC721ReceiverLi
     error InexactTransfer(address token, uint256 expected, uint256 received);
 
     event FactorySet(address factory);
+    event FeeSplitterSet(address indexed feeSplitter);
     event PositionLocked(address indexed token, uint256 indexed tokenId);
     event TokenSupplyLocked(address indexed token, uint256 amount);
     /**
@@ -83,11 +91,15 @@ contract PairPadLaunchLocker is Ownable2Step, ReentrancyGuard, IERC721ReceiverLi
         uint256 creatorAmount0,
         uint256 creatorAmount1
     );
+    event FeesForwardedToSplitter(
+        address indexed token, address currency0, address currency1, uint256 amount0, uint256 amount1
+    );
 
     IPositionManager public immutable positionManager;
     IPoolManager public immutable poolManager;
     IPairPadFeeEscrow public immutable feeEscrow;
     IPairPadLaunchFactoryView public factory;
+    IViralFeeSplitter public feeSplitter;
 
     mapping(address token => uint256 tokenId) public lockedPositions;
     mapping(address token => uint256 amount) public lockedTokenSupply;
@@ -120,6 +132,16 @@ contract PairPadLaunchLocker is Ownable2Step, ReentrancyGuard, IERC721ReceiverLi
         if (factory_ == address(0)) revert ZeroAddress();
         factory = IPairPadLaunchFactoryView(factory_);
         emit FactorySet(factory_);
+    }
+
+    /// @notice One-time wiring for ViralTerminal's 50/20/10/20 fee system.
+    /// Existing baseline deployments may leave this unset and keep the legacy
+    /// two-way split; every ViralTerminal deployment must set it before launch.
+    function setFeeSplitter(address feeSplitter_) external onlyOwner {
+        if (address(feeSplitter) != address(0)) revert FeeSplitterAlreadySet();
+        if (feeSplitter_ == address(0)) revert ZeroAddress();
+        feeSplitter = IViralFeeSplitter(feeSplitter_);
+        emit FeeSplitterSet(feeSplitter_);
     }
 
     /**
@@ -226,14 +248,31 @@ contract PairPadLaunchLocker is Ownable2Step, ReentrancyGuard, IERC721ReceiverLi
         amount1 = _balance(key.currency1) - before1;
         if (amount0 == 0 && amount1 == 0) return (0, 0);
 
+        if (address(feeSplitter) != address(0)) {
+            _forwardToSplitter(
+                key.currency0, launch.creatorFeeRecipient, amount0, launch.baseFeeBps, launch.creatorTaxBps
+            );
+            _forwardToSplitter(
+                key.currency1, launch.creatorFeeRecipient, amount1, launch.baseFeeBps, launch.creatorTaxBps
+            );
+            emit FeesForwardedToSplitter(
+                token, Currency.unwrap(key.currency0), Currency.unwrap(key.currency1), amount0, amount1
+            );
+            return (amount0, amount1);
+        }
+
         // protocol share of the whole fee = share of base * base / (base + tax)
         uint256 totalFeeBps = uint256(launch.baseFeeBps) + launch.creatorTaxBps;
         uint256 protocol0 = totalFeeBps == 0
             ? 0
-            : FullMath.mulDiv(amount0, uint256(launch.baseFeeBps) * launch.protocolFeeShareBps, totalFeeBps * BASIS_POINTS);
+            : FullMath.mulDiv(
+                amount0, uint256(launch.baseFeeBps) * launch.protocolFeeShareBps, totalFeeBps * BASIS_POINTS
+            );
         uint256 protocol1 = totalFeeBps == 0
             ? 0
-            : FullMath.mulDiv(amount1, uint256(launch.baseFeeBps) * launch.protocolFeeShareBps, totalFeeBps * BASIS_POINTS);
+            : FullMath.mulDiv(
+                amount1, uint256(launch.baseFeeBps) * launch.protocolFeeShareBps, totalFeeBps * BASIS_POINTS
+            );
 
         _payProtocol(key.currency0, launch.protocolFeeRecipient, protocol0);
         _credit(key.currency0, launch.creatorFeeRecipient, amount0 - protocol0);
@@ -289,6 +328,23 @@ contract PairPadLaunchLocker is Ownable2Step, ReentrancyGuard, IERC721ReceiverLi
         feeEscrow.creditToken(recipient, asset, amount);
         uint256 received = IERC20(asset).balanceOf(address(feeEscrow)) - escrowBefore;
         if (received != amount) revert InexactTransfer(asset, amount, received);
+    }
+
+    function _forwardToSplitter(
+        Currency currency,
+        address creator,
+        uint256 amount,
+        uint16 baseFeeBps,
+        uint16 creatorFeeBps
+    ) private {
+        if (amount == 0) return;
+        if (currency.isAddressZero()) {
+            feeSplitter.splitNative{value: amount}(creator, baseFeeBps, creatorFeeBps);
+            return;
+        }
+        address asset = Currency.unwrap(currency);
+        IERC20(asset).forceApprove(address(feeSplitter), amount);
+        feeSplitter.splitToken(creator, asset, amount, baseFeeBps, creatorFeeBps);
     }
 
     /// @notice Accepts native ETH paid out of the pool manager.
