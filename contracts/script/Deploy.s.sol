@@ -62,7 +62,7 @@ contract Deploy is Script {
         address weth = vm.envOr("WETH", RH_WETH);
         address usdg = vm.envOr("USDG", RH_USDG);
         address protocolFeeRecipient = vm.envOr("PROTOCOL_FEE_RECIPIENT", owner);
-        uint256 launchFee = vm.envOr("LAUNCH_FEE", uint256(0.0005 ether));
+        uint256 launchFee = vm.envOr("LAUNCH_FEE", uint256(0.001 ether));
 
         if (block.chainid == 4663) {
             require(poolManager == RH_POOL_MANAGER, "mainnet: POOL_MANAGER override");
