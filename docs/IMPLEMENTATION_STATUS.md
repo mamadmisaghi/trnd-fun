@@ -31,6 +31,9 @@ publish fee behavior that does not match the product specification.
   canonical addresses and transaction hashes are recorded in
   `contracts/deployments/46630/support.json`; the workflow now refuses a
   duplicate support deployment when that manifest exists.
+- Simulated, deployed, and explorer-verified the complete 13-contract core
+  stack on Robinhood Chain testnet. Its configuration, addresses, and
+  transaction hashes are recorded in `contracts/deployments/46630/core.json`.
 - Unit-test status: 57 passed, 0 failed, including a 256-run fee-conservation
   fuzz test and fee-on-transfer rejection coverage.
 
