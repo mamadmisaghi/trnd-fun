@@ -30,6 +30,8 @@ contract SmokeLaunch is Script {
         uint256 configId = vm.envOr("CONFIG_ID", uint256(0));
         uint256 openingBuy = vm.envOr("OPENING_BUY", uint256(0.0002 ether));
         uint256 secondBuy = vm.envOr("SECOND_BUY", uint256(0.0002 ether));
+        uint256 creatorFeeBps = vm.envOr("CREATOR_FEE_BPS", uint256(0));
+        require(creatorFeeBps <= type(uint16).max, "creator fee overflows uint16");
 
         PairPadLaunchFactory.TokenParams memory params = PairPadLaunchFactory.TokenParams({
             name: vm.envOr("TOKEN_NAME", string("Smoke Test")),
@@ -44,7 +46,7 @@ contract SmokeLaunch is Script {
                 farcaster: vm.envOr("TOKEN_FARCASTER", string(""))
             }),
             creatorFeeRecipient: address(0),
-            creatorTaxBps: 0,
+            creatorTaxBps: uint16(creatorFeeBps),
             expectedEconomics: bytes32(0),
             salt: keccak256(abi.encode("smoke", block.timestamp))
         });
