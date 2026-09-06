@@ -3,6 +3,9 @@ name: Deploy Robinhood testnet support
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize]
   workflow_dispatch:
 
 permissions:
@@ -10,7 +13,11 @@ permissions:
 
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[deploy-support]')
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, '[deploy-support]')) ||
+      (github.event_name == 'pull_request' && github.head_ref == 'ops/testnet-support-deploy' &&
+      contains(github.event.pull_request.title, '[deploy-support]'))
     runs-on: ubuntu-latest
     concurrency:
       group: viral-robinhood-testnet-support
@@ -88,4 +95,3 @@ jobs:
             contracts/broadcast/DeployTestnetSupport.s.sol/46630/
             contracts/deployments/46630/support.json
           if-no-files-found: warn
-
