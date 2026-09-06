@@ -1,0 +1,125 @@
+name: Smoke-test Robinhood testnet launch
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: github.head_ref == 'ops/testnet-smoke-launch' && contains(github.event.pull_request.title, '[smoke-launch]')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: viral-robinhood-testnet-smoke
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: contracts
+    env:
+      RH_TESTNET_RPC_URL: https://rpc.testnet.chain.robinhood.com
+      RH_TESTNET_DEPLOYER_ADDRESS: "0x66B6c5e00B1242B9681BCB3bC3bCc3C87C138CaE"
+      RH_TESTNET_DEPLOYER_PRIVATE_KEY: ${{ secrets.RH_TESTNET_DEPLOYER_PRIVATE_KEY }}
+      FACTORY: "0x8D196Fc239AE5C364eF4E8b76A987Acd6065929C"
+      ROUTER: "0x55Bea0D582C48815585164AC476C2C0c71506B5d"
+      CONFIG_ID: "0"
+      OPENING_BUY: "200000000000000"
+      SECOND_BUY: "200000000000000"
+      CREATOR_FEE_BPS: "200"
+      TOKEN_NAME: "ViralTerminal Testnet Genesis"
+      TOKEN_SYMBOL: "VIRALTEST"
+      TOKEN_DESCRIPTION: "First end-to-end ViralTerminal launchpad smoke test on Robinhood Chain Testnet."
+      TOKEN_WEBSITE: "https://viral-terminal.gofivahootan.chatgpt.site"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.1
+
+      - name: Validate prerequisites
+        run: bash testnet-preflight.sh
+
+      - name: Prevent duplicate smoke launch
+        run: |
+          if [[ -f deployments/46630/smoke.json ]]; then
+            echo "Smoke launch is already recorded for chain 46630."
+            exit 1
+          fi
+
+      - name: Build and test
+        run: |
+          forge build
+          forge test --no-match-path "test/fork/*"
+
+      - name: Simulate smoke launch
+        env:
+          PRIVATE_KEY: ${{ secrets.RH_TESTNET_DEPLOYER_PRIVATE_KEY }}
+        run: |
+          if [[ "$PRIVATE_KEY" != 0x* ]]; then
+            PRIVATE_KEY="0x$PRIVATE_KEY"
+            export PRIVATE_KEY
+          fi
+          forge script script/SmokeLaunch.s.sol:SmokeLaunch \
+            --rpc-url "$RH_TESTNET_RPC_URL" \
+            -vvvv
+
+      - name: Broadcast smoke launch
+        env:
+          PRIVATE_KEY: ${{ secrets.RH_TESTNET_DEPLOYER_PRIVATE_KEY }}
+        run: |
+          if [[ "$PRIVATE_KEY" != 0x* ]]; then
+            PRIVATE_KEY="0x$PRIVATE_KEY"
+            export PRIVATE_KEY
+          fi
+          forge script script/SmokeLaunch.s.sol:SmokeLaunch \
+            --rpc-url "$RH_TESTNET_RPC_URL" \
+            --broadcast \
+            -vvvv 2>&1 | tee smoke-launch.log
+
+      - name: Create smoke manifest
+        run: |
+          token=$(grep -E '^  token:' smoke-launch.log | tail -1 | awk '{print $NF}')
+          pool_id=$(grep -E '^  poolId:' smoke-launch.log | tail -1 | awk '{print $NF}')
+          if [[ -z "$token" || -z "$pool_id" ]]; then
+            echo "Unable to parse smoke token or pool ID."
+            exit 1
+          fi
+
+          mkdir -p deployments/46630
+          jq \
+            --arg token "$token" \
+            --arg poolId "$pool_id" \
+            --arg factory "$FACTORY" \
+            --arg router "$ROUTER" \
+            '{
+              chainId: 46630,
+              network: "Robinhood Chain Testnet",
+              token: $token,
+              poolId: $poolId,
+              factory: $factory,
+              router: $router,
+              pairToken: "0x0000000000000000000000000000000000000000",
+              creatorFeeBps: 200,
+              transactions: [.transactions[] | {hash, transactionType, function}]
+            }' \
+            broadcast/SmokeLaunch.s.sol/46630/run-latest.json \
+            > deployments/46630/smoke.json
+          jq . deployments/46630/smoke.json
+
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: robinhood-testnet-smoke-${{ github.run_number }}
+          path: |
+            contracts/broadcast/SmokeLaunch.s.sol/46630/
+            contracts/deployments/46630/smoke.json
+            contracts/smoke-launch.log
+          if-no-files-found: warn
