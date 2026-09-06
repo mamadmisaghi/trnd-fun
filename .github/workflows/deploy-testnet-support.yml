@@ -53,6 +53,10 @@ jobs:
         env:
           PRIVATE_KEY: ${{ secrets.RH_TESTNET_DEPLOYER_PRIVATE_KEY }}
         run: |
+          if [[ "$PRIVATE_KEY" != 0x* ]]; then
+            PRIVATE_KEY="0x$PRIVATE_KEY"
+            export PRIVATE_KEY
+          fi
           forge script script/DeployTestnetSupport.s.sol:DeployTestnetSupport \
             --rpc-url "$RH_TESTNET_RPC_URL" \
             --broadcast \
