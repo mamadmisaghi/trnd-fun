@@ -1,0 +1,33 @@
+{
+  "chainId": 46630,
+  "network": "Robinhood Chain Testnet",
+  "deployer": "0x66B6c5e00B1242B9681BCB3bC3bCc3C87C138CaE",
+  "deployment": {
+    "workflowRunId": 34031978930,
+    "workflowJobId": 101483062959,
+    "artifactId": 9988946858,
+    "verified": true
+  },
+  "contracts": {
+    "testWeth": {
+      "address": "0xfCEDD91c7d8a32c0747D8B076b394EfDC5833C60",
+      "transactionHash": "0xb966e7adee8cbd088f49437335e3d95829259c8343461af508c8ddbe4d9f889d"
+    },
+    "testUsdg": {
+      "address": "0x20A887523fbbF0024eB46ee672DF15A95521E680",
+      "transactionHash": "0x300bd655caf4548c296b047bdf2c9d6fdb7d02e6a5dd50ca9a7a13ca4bda5351"
+    },
+    "testnetV3Factory": {
+      "address": "0x91ad675ef9b9A935B00BAd1B74bD1E18cbE03026",
+      "transactionHash": "0xbe49143f3b284dd95b22279ce9c3c3acd31065ace197637e5096231eed4f7b39"
+    },
+    "testnetSwapRouterStub": {
+      "address": "0xa3bAA042FeBFbC06AaBf00Fb3dFB3CbB7abFe92D",
+      "transactionHash": "0xbf7f6a118a6fc73109e62def07bc4de20d8e5b7314a59c23cc4b44b794729620"
+    },
+    "wethUsdgReferencePool": {
+      "address": "0x5974C84A89e61574ED196F44FF328e11D9Fc318b",
+      "transactionHash": "0xaf665b4371e6c9c5b1a81e3e9cb7222832de48dd4ce37622e51f26d18e855096"
+    }
+  }
+}
