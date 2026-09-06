@@ -24,7 +24,11 @@ publish fee behavior that does not match the product specification.
 - Added an automated GitHub testnet preflight that validates the deployer,
   chain ID, gas balance, and external Uniswap contract bytecode without
   exposing the private key.
-- Unit-test status: 55 passed, 0 failed.
+- Confirmed the configured deployer has `0.02` test ETH and that PoolManager,
+  PositionManager, and Permit2 have bytecode on chain `46630`.
+- Added a staged, artifact-producing support-stack deployment workflow.
+- Unit-test status: 57 passed, 0 failed, including a 256-run fee-conservation
+  fuzz test and fee-on-transfer rejection coverage.
 
 ## Required before testnet broadcast
 

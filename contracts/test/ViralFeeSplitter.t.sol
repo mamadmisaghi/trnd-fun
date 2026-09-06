@@ -7,7 +7,7 @@ import {PairPadFeeEscrow} from "../src/v2/PairPadFeeEscrow.sol";
 import {ViralRewardVault} from "../src/viral/ViralRewardVault.sol";
 import {ViralFeeSplitter, IViralCreatorEscrow, IViralRewardFunder} from "../src/viral/ViralFeeSplitter.sol";
 import {ViralTreasuryVault} from "../src/viral/ViralTreasuryVault.sol";
-import {MockERC20} from "./mocks/MockERC20.sol";
+import {MockERC20, MockFeeOnTransferERC20} from "./mocks/MockERC20.sol";
 
 contract ViralFeeSplitterTest is Test {
     address internal creator = address(0xC0FFEE);
@@ -86,6 +86,35 @@ contract ViralFeeSplitterTest is Test {
 
         assertEq(escrow.balanceOfToken(creator, address(token)), 1);
         assertEq(token.balanceOf(address(splitter)), 0);
+    }
+
+    function testRejectsFeeOnTransferAssetBeforeCreatingClaims() external {
+        MockFeeOnTransferERC20 taxedToken = new MockFeeOnTransferERC20();
+        taxedToken.mint(address(this), 100 ether);
+        taxedToken.approve(address(splitter), 100 ether);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ViralFeeSplitter.InexactTransfer.selector, address(taxedToken), 100 ether, 99 ether)
+        );
+        splitter.splitToken(creator, address(taxedToken), 100 ether, 100, 0);
+
+        assertEq(escrow.balanceOfToken(creator, address(taxedToken)), 0);
+        assertEq(taxedToken.balanceOf(address(splitter)), 0);
+    }
+
+    function testFuzzPreviewAlwaysConserves(uint128 rawAmount, uint16 rawBaseFeeBps, uint16 rawCreatorFeeBps)
+        external
+        view
+    {
+        uint256 amount = bound(uint256(rawAmount), 1, type(uint128).max);
+        uint16 baseFeeBps = uint16(bound(uint256(rawBaseFeeBps), 1, 1_000));
+        uint16 creatorFeeBps = uint16(bound(uint256(rawCreatorFeeBps), 0, 1_000));
+
+        (uint256 creatorAmount, uint256 rewardsAmount, uint256 operationsAmount, uint256 buybackAmount) =
+            splitter.preview(amount, baseFeeBps, creatorFeeBps);
+
+        assertEq(creatorAmount + rewardsAmount + operationsAmount + buybackAmount, amount);
+        assertGe(creatorAmount, rewardsAmount + operationsAmount + buybackAmount);
     }
 
     function testOnlyLockerMaySplit() external {
