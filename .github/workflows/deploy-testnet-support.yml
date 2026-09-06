@@ -44,6 +44,13 @@ jobs:
       - name: Validate deployment prerequisites
         run: bash testnet-preflight.sh
 
+      - name: Prevent duplicate support deployment
+        run: |
+          if [[ -f deployments/46630/support.json ]]; then
+            echo "Support deployment is already recorded for chain 46630."
+            exit 1
+          fi
+
       - name: Build and test support deployment
         run: |
           forge build
