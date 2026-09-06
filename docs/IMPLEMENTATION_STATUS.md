@@ -27,6 +27,10 @@ publish fee behavior that does not match the product specification.
 - Confirmed the configured deployer has `0.02` test ETH and that PoolManager,
   PositionManager, and Permit2 have bytecode on chain `46630`.
 - Added a staged, artifact-producing support-stack deployment workflow.
+- Deployed and explorer-verified the Robinhood testnet support stack. The
+  canonical addresses and transaction hashes are recorded in
+  `contracts/deployments/46630/support.json`; the workflow now refuses a
+  duplicate support deployment when that manifest exists.
 - Unit-test status: 57 passed, 0 failed, including a 256-run fee-conservation
   fuzz test and fee-on-transfer rejection coverage.
 
