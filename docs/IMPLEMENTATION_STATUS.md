@@ -34,6 +34,10 @@ publish fee behavior that does not match the product specification.
 - Simulated, deployed, and explorer-verified the complete 13-contract core
   stack on Robinhood Chain testnet. Its configuration, addresses, and
   transaction hashes are recorded in `contracts/deployments/46630/core.json`.
+- Completed an onchain end-to-end smoke launch with native ETH pairing, a
+  2% creator fee, atomic creator buy, second buy, and partial sell. Token,
+  pool, output amounts, pending LP fees, and transaction hashes are recorded
+  in `contracts/deployments/46630/smoke.json`.
 - Unit-test status: 57 passed, 0 failed, including a 256-run fee-conservation
   fuzz test and fee-on-transfer rejection coverage.
 
