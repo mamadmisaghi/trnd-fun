@@ -30,8 +30,7 @@ jobs:
 
           nonce=0
           for attempt in $(seq 1 20); do
-            nonce_hex=$(cast rpc --rpc-url "$RPC_URL" eth_getTransactionCount "$DEPLOYER" latest)
-            nonce=$(cast to-dec "$nonce_hex")
+            nonce=$(cast nonce --rpc-url "$RPC_URL" "$DEPLOYER")
             echo "Observation $attempt: deployer nonce is $nonce"
             if [ "$nonce" -ge 5 ]; then
               break
@@ -40,29 +39,12 @@ jobs:
           done
 
           balance_wei=$(cast balance --rpc-url "$RPC_URL" "$DEPLOYER")
-          weth=$(cast compute-address "$DEPLOYER" --nonce 0 | awk '{print $NF}')
-          usdg=$(cast compute-address "$DEPLOYER" --nonce 1 | awk '{print $NF}')
-          v3_factory=$(cast compute-address "$DEPLOYER" --nonce 2 | awk '{print $NF}')
-          router_stub=$(cast compute-address "$DEPLOYER" --nonce 3 | awk '{print $NF}')
-          weth_usdg_pool=$(cast compute-address "$v3_factory" --nonce 1 | awk '{print $NF}')
-
-          has_code() {
-            local code
-            code=$(cast code --rpc-url "$RPC_URL" "$1")
-            if [ "$code" != "0x" ]; then printf true; else printf false; fi
-          }
-
           mkdir -p contracts/deployments/46630
           jq -n \
             --arg observedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --arg deployer "$DEPLOYER" \
             --argjson nonce "$nonce" \
             --arg balanceWei "$balance_wei" \
-            --arg weth "$weth" --argjson wethCode "$(has_code "$weth")" \
-            --arg usdg "$usdg" --argjson usdgCode "$(has_code "$usdg")" \
-            --arg factory "$v3_factory" --argjson factoryCode "$(has_code "$v3_factory")" \
-            --arg router "$router_stub" --argjson routerCode "$(has_code "$router_stub")" \
-            --arg pool "$weth_usdg_pool" --argjson poolCode "$(has_code "$weth_usdg_pool")" \
             '{
               chainId: 46630,
               network: "Robinhood Chain Testnet",
@@ -70,16 +52,7 @@ jobs:
               deployer: $deployer,
               deployerNonce: $nonce,
               deployerBalanceWei: $balanceWei,
-              supportDeploymentComplete: (
-                $nonce >= 5 and $wethCode and $usdgCode and $factoryCode and $routerCode and $poolCode
-              ),
-              contracts: {
-                testWeth: {address: $weth, hasCode: $wethCode},
-                testUsdg: {address: $usdg, hasCode: $usdgCode},
-                testnetV3Factory: {address: $factory, hasCode: $factoryCode},
-                testnetSwapRouterStub: {address: $router, hasCode: $routerCode},
-                wethUsdgReferencePool: {address: $pool, hasCode: $poolCode}
-              }
+              supportTransactionsObserved: ($nonce >= 5)
             }' > contracts/deployments/46630/status.json
 
           jq . contracts/deployments/46630/status.json
