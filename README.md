@@ -14,6 +14,7 @@ Project documents:
 - [`docs/VIRAL_PROTOCOL_SPEC.md`](docs/VIRAL_PROTOCOL_SPEC.md)
 - [`docs/SECURITY_AND_RELEASE_PLAN.md`](docs/SECURITY_AND_RELEASE_PLAN.md)
 - [`docs/BASELINE_REPORT.md`](docs/BASELINE_REPORT.md)
+- [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md)
 - [`THIRD_PARTY_NOTICE.md`](THIRD_PARTY_NOTICE.md)
 
 ## Upstream baseline
