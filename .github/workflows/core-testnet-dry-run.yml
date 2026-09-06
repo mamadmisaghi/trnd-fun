@@ -1,0 +1,61 @@
+name: Simulate Robinhood testnet core deployment
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    if: github.head_ref == 'ops/testnet-core-dry-run'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    env:
+      RH_TESTNET_RPC_URL: https://rpc.testnet.chain.robinhood.com
+      RH_TESTNET_DEPLOYER_ADDRESS: "0x66B6c5e00B1242B9681BCB3bC3bCc3C87C138CaE"
+      RH_TESTNET_DEPLOYER_PRIVATE_KEY: ${{ secrets.RH_TESTNET_DEPLOYER_PRIVATE_KEY }}
+      POOL_MANAGER: "0x8366a39CC670B4001A1121B8F6A443A643e40951"
+      POSITION_MANAGER: "0x58daec3116aae6D93017bAAea7749052E8a04fA7"
+      PERMIT2: "0x000000000022D473030F116dDEE9F6B43aC78BA3"
+      V3_FACTORY: "0x91ad675ef9b9A935B00BAd1B74bD1E18cbE03026"
+      SWAP_ROUTER_02: "0xa3bAA042FeBFbC06AaBf00Fb3dFB3CbB7abFe92D"
+      WETH: "0xfCEDD91c7d8a32c0747D8B076b394EfDC5833C60"
+      USDG: "0x20A887523fbbF0024eB46ee672DF15A95521E680"
+      PROTOCOL_FEE_RECIPIENT: "0x66B6c5e00B1242B9681BCB3bC3bCc3C87C138CaE"
+      FINAL_OWNER: "0x66B6c5e00B1242B9681BCB3bC3bCc3C87C138CaE"
+      LAUNCH_FEE: "1000000000000000"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.1
+
+      - name: Validate deployment prerequisites
+        run: bash testnet-preflight.sh
+
+      - name: Build and test
+        run: |
+          forge build
+          forge test --no-match-path "test/fork/*"
+
+      - name: Simulate full core deployment
+        env:
+          PRIVATE_KEY: ${{ secrets.RH_TESTNET_DEPLOYER_PRIVATE_KEY }}
+        run: |
+          if [[ "$PRIVATE_KEY" != 0x* ]]; then
+            PRIVATE_KEY="0x$PRIVATE_KEY"
+            export PRIVATE_KEY
+          fi
+          forge script script/Deploy.s.sol:Deploy \
+            --rpc-url "$RH_TESTNET_RPC_URL" \
+            -vvvv
