@@ -42,7 +42,7 @@ The docs on the site cover the same surface plus the public indexer API.
 ## How a launch works on chain
 
 1. `PairPadLaunchFactory.launchToken(params, configId, pairToken)` with `launchFee()`
-   (0.0005 ETH) as value. `pairToken` is `address(0)` for native ETH or any ERC-20 the pricer
+   (0.001 ETH) as value. `pairToken` is `address(0)` for native ETH or any ERC-20 the pricer
    accepts. The factory asks `PairPadLaunchDeployer` to CREATE2 a `PairPadLauncherToken` with
    the full 1,000,000,000 supply minted to `PairPadPositionMinter`.
 2. The factory works out the opening price from the config's phantom quote reserve
