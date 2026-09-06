@@ -1,0 +1,44 @@
+{
+  "chainId": 46630,
+  "network": "Robinhood Chain Testnet",
+  "deployment": {
+    "workflowRunId": 34032876329,
+    "workflowJobId": 101485576999,
+    "artifactId": 9989212032,
+    "onchainExecutionComplete": true
+  },
+  "token": {
+    "name": "ViralTerminal Testnet Genesis",
+    "symbol": "VIRALTEST",
+    "address": "0x06353b828dBeB40908f5e08c56a6F7bB60fE92e3"
+  },
+  "market": {
+    "poolId": "0x7f53c547a2fd984d49bc6803ec721e7454b5413a066135cd0049aae1250aa470",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "positionId": 2980,
+    "baseFeeBps": 100,
+    "creatorFeeBps": 200,
+    "poolFeePips": 30000
+  },
+  "contracts": {
+    "factory": "0x8D196Fc239AE5C364eF4E8b76A987Acd6065929C",
+    "router": "0x55Bea0D582C48815585164AC476C2C0c71506B5d"
+  },
+  "results": {
+    "openingBuyWei": "200000000000000",
+    "openingBuyTokensOut": "143083488627905706974784",
+    "secondBuyWei": "200000000000000",
+    "secondBuyTokensOut": "143042548716295220277777",
+    "soldTokens": "71521274358147610138888",
+    "sellEthOutWei": "94096932822497",
+    "pendingFeesCurrency0": "11999999999999",
+    "pendingFeesCurrency1": "2145638230744428304166",
+    "creatorTokenBalance": "214604762986053317113673"
+  },
+  "transactions": {
+    "launchAndCreatorBuy": "0xdd99bf3087f6f73e34bb1d3047a2b9d0649f386a8bba9dfd314945d798a1c328",
+    "secondBuy": "0xa1d6cdec5be13e7f281803287cc8ca92d082fe25e5a96d0e99324466462d845f",
+    "sellApproval": "0x8e0e117cf17cc62d0bb54d7ba2b8fb7f7a2cc26220d65f902e48d2962c4c06b6",
+    "partialSell": "0xe68cedc5686b7ce094464d6aaebffb74d35afa5cf2005bb96d208aacf79e00e9"
+  }
+}

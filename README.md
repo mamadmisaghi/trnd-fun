@@ -237,6 +237,10 @@ Sourcify verification; they read keys and the RPC URL from `contracts/.env.mainn
 not committed. `script/SmokeLaunch.s.sol` launches and trades a token against a live
 deployment and prints the fees the position earned.
 
+## Deployment records
+
+The [`deployment-packages/`](./deployment-packages) directory contains immutable developer handoffs for notable deployments. The first Robinhood Chain Testnet deployment, verified addresses, integration ABIs, public frontend variables, and end-to-end smoke-test results are archived under [`deployment-packages/robinhood-testnet-genesis/`](./deployment-packages/robinhood-testnet-genesis).
+
 ## Security
 
 The contracts have not been audited. Liquidity is held by a locker with no withdraw function,
