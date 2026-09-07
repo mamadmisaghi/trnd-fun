@@ -34,7 +34,7 @@ contract DeployTestnetEthRoutes is Script {
         PairPadLaunchFactory factory = PairPadLaunchFactory(payable(vm.envAddress("FACTORY")));
         address usdg = vm.envAddress("USDG");
         address rwa = vm.envAddress("RWA_TOKEN");
-        uint256 seedEth = vm.envOr("ADAPTER_SEED_ETH_WEI", uint256(0.05 ether));
+        uint256 seedEth = vm.envOr("ADAPTER_SEED_ETH_WEI", uint256(0.005 ether));
         uint256 seedUsdg = vm.envOr("ADAPTER_SEED_USDG", uint256(225_000_000));
         uint256 seedRwa = vm.envOr("ADAPTER_SEED_RWA", uint256(1 ether));
 
