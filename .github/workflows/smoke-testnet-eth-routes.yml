@@ -1,0 +1,68 @@
+name: Smoke-test Robinhood testnet ETH routes
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && github.head_ref == 'ops/testnet-eth-route-smoke' &&
+      contains(github.event.pull_request.title, '[smoke-testnet-eth-routes]'))
+    runs-on: ubuntu-latest
+    concurrency:
+      group: trnd-robinhood-testnet-eth-route-smoke
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: contracts
+    env:
+      RH_TESTNET_RPC_URL: https://rpc.testnet.chain.robinhood.com
+      RH_TESTNET_DEPLOYER_ADDRESS: "0x66B6c5e00B1242B9681BCB3bC3bCc3C87C138CaE"
+      RH_TESTNET_DEPLOYER_PRIVATE_KEY: ${{ secrets.RH_TESTNET_DEPLOYER_PRIVATE_KEY }}
+      FACTORY: "0x8D196Fc239AE5C364eF4E8b76A987Acd6065929C"
+      ROUTER: "0xc3e36d0c7374dee38a092356a59e0829404729e9"
+      USDG: "0x20A887523fbbF0024eB46ee672DF15A95521E680"
+    steps:
+      - name: Checkout main plus smoke script
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.1
+
+      - name: Validate, build and test
+        run: |
+          bash testnet-preflight.sh
+          forge build
+          forge test --no-match-path "test/fork/*"
+
+      - name: Execute launch, ETH buy, ETH sell, collect and claim
+        env:
+          PRIVATE_KEY: ${{ secrets.RH_TESTNET_DEPLOYER_PRIVATE_KEY }}
+        run: |
+          if [[ "$PRIVATE_KEY" != 0x* ]]; then
+            PRIVATE_KEY="0x$PRIVATE_KEY"
+            export PRIVATE_KEY
+          fi
+          forge script script/SmokeTestnetEthRoutes.s.sol:SmokeTestnetEthRoutes \
+            --rpc-url "$RH_TESTNET_RPC_URL" \
+            --broadcast \
+            -vvvv
+
+      - name: Upload smoke broadcast
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: robinhood-testnet-eth-route-smoke-${{ github.run_number }}
+          path: contracts/broadcast/SmokeTestnetEthRoutes.s.sol/46630/
+          if-no-files-found: warn
