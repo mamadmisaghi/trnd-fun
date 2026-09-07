@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 
 import {PairPadLaunchFactory} from "../src/v2/PairPadLaunchFactory.sol";
-import {PairPadRouter} from "../src/v2/PairPadRouter.sol";
+import {ISwapRouter02, IWETH9, PairPadRouter} from "../src/v2/PairPadRouter.sol";
 import {TestnetEthQuoteAdapter, TestnetWrappedEther} from "../src/testnet/TestnetEthQuoteAdapter.sol";
 
 interface ITestnetMintable {
@@ -60,7 +60,10 @@ contract DeployTestnetEthRoutes is Script {
         weth.transfer(address(adapter), seedEth);
 
         PairPadRouter router = new PairPadRouter(
-            IPoolManager(address(factory.poolManager())), factory, adapter, weth
+            IPoolManager(address(factory.poolManager())),
+            factory,
+            ISwapRouter02(address(adapter)),
+            IWETH9(address(weth))
         );
         factory.setLaunchForwarder(address(router));
 
