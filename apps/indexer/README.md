@@ -51,6 +51,14 @@ ephemeral PostgreSQL database. This read-only smoke test verifies live RPC log
 decoding, contract metadata and holder-transfer persistence without sending a
 transaction.
 
+CI runs `npm run test:postgres` against PostgreSQL 16 before the chain smoke
+test. It verifies both a clean first install and an upgrade from the pre-ledger
+`001_initial.sql` schema, checks the resulting tables, columns, indexes and
+constraints, preserves representative indexed rows, and confirms that rerunning
+the migrations is idempotent. Set `TEST_DATABASE_URL` to run the same disposable-
+schema integration tests locally; the test deletes only its randomly named
+temporary schemas.
+
 ## Container image
 
 Build with `docker build -t trnd-indexer .`. Run migrations as a one-off command
