@@ -7,9 +7,29 @@ import { createIndexer } from "../src/indexer.js";
 const config = loadConfig();
 const db = createDatabase(config.databaseUrl);
 
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+async function syncWithResume(indexer) {
+  const maximumAttempts = Math.max(1, config.backfillMaxAttempts);
+  for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
+    try {
+      return await indexer.syncOnce();
+    } catch (error) {
+      if (attempt === maximumAttempts) throw error;
+      const delay = Math.min(
+        config.rpcMaxBackoffMs,
+        config.backfillRetryDelayMs * (2 ** Math.min(attempt - 1, 6)),
+      );
+      process.stderr.write(`Backfill interrupted (${error?.code || error?.name || "RPC error"}); resuming from the persisted checkpoint in ${delay}ms (${attempt}/${maximumAttempts}).\n`);
+      await wait(delay);
+    }
+  }
+  throw new Error("Backfill retry budget exhausted.");
+}
+
 try {
   const indexer = createIndexer(config, db, createEventHub());
-  const completed = await indexer.syncOnce();
+  const completed = await syncWithResume(indexer);
   const state = await db.query("SELECT cursor_block,cursor_block_hash,updated_at FROM indexer_state WHERE chain_id=$1", [config.chainId]);
   const counts = {};
   for (const table of ["raw_events", "launches", "trades", "fee_collections", "fee_claims", "token_transfers", "holder_balances", "candles", "reward_funding", "reward_finalizations"]) {

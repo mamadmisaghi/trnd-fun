@@ -23,6 +23,8 @@ export function loadConfig() {
     rpcRetryCount: integer("RPC_RETRY_COUNT", 3),
     rpcRetryDelayMs: integer("RPC_RETRY_DELAY_MS", 500),
     rpcMaxBackoffMs: integer("RPC_MAX_BACKOFF_MS", 60_000),
+    backfillMaxAttempts: integer("BACKFILL_MAX_ATTEMPTS", 20),
+    backfillRetryDelayMs: integer("BACKFILL_RETRY_DELAY_MS", 10_000),
     readinessMaxLagBlocks: BigInt(integer("READINESS_MAX_LAG_BLOCKS", 2_400)),
     apiPort: integer("API_PORT", 8787),
     corsOrigin: process.env.CORS_ORIGIN || "http://localhost:3000",
