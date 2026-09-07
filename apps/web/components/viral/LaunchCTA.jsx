@@ -34,7 +34,7 @@ export default function LaunchCTA() {
             See a trend? Launch it on Robinhood Chain in under a minute.
           </h2>
           <p className="mt-3 text-secondarytext max-w-lg">
-            ViralTerminal preserves the source event, recommends the matching RWA, and prepares the launch through o1.
+            TRND.fun preserves the source event, recommends the matching RWA, and prepares the launch through o1.
           </p>
         </div>
 

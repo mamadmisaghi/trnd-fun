@@ -3,11 +3,11 @@ import { X, TrendingUp, Rocket, GraduationCap, UserPlus, Flame } from "lucide-re
 import { notifications } from "@/data";
 
 const iconMap = {
-  score: { icon: TrendingUp, color: "#A8FF00" },
-  launch: { icon: Rocket, color: "#A8FF00" },
-  graduate: { icon: GraduationCap, color: "#FFFFFF" },
-  creator: { icon: UserPlus, color: "#A9A9A9" },
-  heat: { icon: Flame, color: "#A8FF00" },
+  score: { icon: TrendingUp, color: "#9CFF2E" },
+  launch: { icon: Rocket, color: "#9CFF2E" },
+  graduate: { icon: GraduationCap, color: "#F3F5F3" },
+  creator: { icon: UserPlus, color: "#A2AAA1" },
+  heat: { icon: Flame, color: "#9CFF2E" },
 };
 
 export default function NotificationsPanel({ open, onClose }) {

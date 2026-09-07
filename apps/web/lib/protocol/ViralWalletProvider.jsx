@@ -18,6 +18,7 @@ import {
 import {
   erc20Abi,
   feeEscrowAbi,
+  getTestnetEthLeg,
   getTestnetPair,
   launchFactoryAbi,
   launchLockerAbi,
@@ -244,29 +245,21 @@ export function ViralWalletProvider({ children }) {
       providerClient.readContract({ address: protocolContracts.launchFactory, abi: launchFactoryAbi, functionName: "launchFee" }),
       providerClient.readContract({ address: protocolContracts.launchFactory, abi: launchFactoryAbi, functionName: "previewLaunchEconomics", args: [0n, pair.address] }),
     ]);
-    const quoteIn = parseUnits(String(openingBuyAmount || "0"), pair.decimals);
-    if (quoteIn > 0n) {
-      const allowance = await providerClient.readContract({ address: pair.address, abi: erc20Abi, functionName: "allowance", args: [account, protocolContracts.router] });
-      if (allowance < quoteIn) {
-        const approvalHash = await walletClient.writeContract({ address: pair.address, abi: erc20Abi, functionName: "approve", args: [protocolContracts.router, quoteIn] });
-        const approvalReceipt = await providerClient.waitForTransactionReceipt({ hash: approvalHash, confirmations: 1 });
-        if (approvalReceipt.status !== "success") throw new Error(`${pair.symbol} approval reverted.`);
-      }
-    }
+    const openingBuy = parseEther(String(openingBuyEth ?? openingBuyAmount ?? "0"));
     const args = [
       createLaunchParams({ account, ...launch, expectedEconomics }),
       0n,
       pair.address,
-      quoteIn,
+      getTestnetEthLeg(pair, "buy"),
       0n,
     ];
-    await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "launchAndBuyWithQuote", args, value: launchFee });
-    const hash = await walletClient.writeContract({ address: protocolContracts.router, abi: routerAbi, functionName: "launchAndBuyWithQuote", args, value: launchFee });
+    await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "launchAndBuyWithEth", args, value: launchFee + openingBuy });
+    const hash = await walletClient.writeContract({ address: protocolContracts.router, abi: routerAbi, functionName: "launchAndBuyWithEth", args, value: launchFee + openingBuy });
     const receipt = await providerClient.waitForTransactionReceipt({ hash, confirmations: 1 });
     if (receipt.status !== "success") throw new Error("The transaction reverted on Robinhood Chain Testnet.");
     const { tokenAddress, poolId } = decodeLaunchReceipt(receipt);
     await refresh();
-    return { hash, receipt, tokenAddress, poolId, launchFee, openingBuy: quoteIn, pair };
+    return { hash, receipt, tokenAddress, poolId, launchFee, openingBuy, pair };
   }, [address, connect, launchWithEth, refresh, switchNetwork]);
 
   const getConnectedClients = useCallback(async () => {
@@ -345,20 +338,13 @@ export function ViralWalletProvider({ children }) {
     const market = await readMarket(tokenAddress, account);
     if (!amount || Number(amount) <= 0) throw new Error("Enter an amount greater than zero.");
     if (side === "buy") {
-      if (!market.pairIsNative) {
-        const pairIn = parseUnits(String(amount), market.pairDecimals);
-        const allowance = await providerClient.readContract({ address: market.pairAddress, abi: erc20Abi, functionName: "allowance", args: [account, protocolContracts.router] });
-        if (allowance < pairIn) return { raw: null, formatted: null, decimals: market.decimals, approvalRequired: true };
-        const simulation = await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "swapExactIn", args: [market.poolKey, market.poolKey.currency0.toLowerCase() === market.pairAddress.toLowerCase(), pairIn, 0n, account] });
-        return { raw: simulation.result, formatted: formatUnits(simulation.result, market.decimals), decimals: market.decimals };
-      }
       const value = parseEther(String(amount));
       const simulation = await providerClient.simulateContract({
         account,
         address: protocolContracts.router,
         abi: routerAbi,
         functionName: "buyWithEth",
-        args: [market.poolKey, emptyEthLeg, 0n, account],
+        args: [market.poolKey, market.pairIsNative ? emptyEthLeg : getTestnetEthLeg({ address: market.pairAddress }, "buy"), 0n, account],
         value,
       });
       return { raw: simulation.result, formatted: formatUnits(simulation.result, market.decimals), decimals: market.decimals };
@@ -367,16 +353,12 @@ export function ViralWalletProvider({ children }) {
     const allowance = await providerClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: "allowance", args: [account, protocolContracts.router] });
     if (allowance < tokensIn) return { raw: null, formatted: null, decimals: 18, approvalRequired: true };
     const tokenIsCurrency0 = market.poolKey.currency0.toLowerCase() === tokenAddress.toLowerCase();
-    if (!market.pairIsNative) {
-      const simulation = await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "swapExactIn", args: [market.poolKey, tokenIsCurrency0, tokensIn, 0n, account] });
-      return { raw: simulation.result, formatted: formatUnits(simulation.result, market.pairDecimals), decimals: market.pairDecimals, approvalRequired: false };
-    }
     const simulation = await providerClient.simulateContract({
       account,
       address: protocolContracts.router,
       abi: routerAbi,
       functionName: "sellToEth",
-      args: [market.poolKey, tokenIsCurrency0, tokensIn, emptyEthLeg, 0n, account],
+      args: [market.poolKey, tokenIsCurrency0, tokensIn, market.pairIsNative ? emptyEthLeg : getTestnetEthLeg({ address: market.pairAddress }, "sell"), 0n, account],
     });
     return { raw: simulation.result, formatted: formatEther(simulation.result), decimals: 18, approvalRequired: false };
   }, [getConnectedClients, readMarket]);
@@ -391,29 +373,12 @@ export function ViralWalletProvider({ children }) {
     let value;
     let quotedOut;
     if (side === "buy") {
-      if (market.pairIsNative) {
-        value = parseEther(String(amount));
-        const preview = await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "buyWithEth", args: [market.poolKey, emptyEthLeg, 0n, account], value });
-        quotedOut = preview.result;
-        functionName = "buyWithEth";
-        args = [market.poolKey, emptyEthLeg, slippageFloor(quotedOut, slippageBps), account];
-      } else {
-        const pairIn = parseUnits(String(amount), market.pairDecimals);
-        if (pairIn > market.pairBalance) throw new Error(`This wallet does not have enough ${market.pairSymbol}.`);
-        const allowance = await providerClient.readContract({ address: market.pairAddress, abi: erc20Abi, functionName: "allowance", args: [account, protocolContracts.router] });
-        if (allowance < pairIn) {
-          onStage?.("approval");
-          approvalHash = await walletClient.writeContract({ address: market.pairAddress, abi: erc20Abi, functionName: "approve", args: [protocolContracts.router, pairIn] });
-          const approvalReceipt = await providerClient.waitForTransactionReceipt({ hash: approvalHash, confirmations: 1 });
-          if (approvalReceipt.status !== "success") throw new Error(`${market.pairSymbol} approval reverted.`);
-        }
-        onStage?.("quoting");
-        const pairIsCurrency0 = market.poolKey.currency0.toLowerCase() === market.pairAddress.toLowerCase();
-        const preview = await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "swapExactIn", args: [market.poolKey, pairIsCurrency0, pairIn, 0n, account] });
-        quotedOut = preview.result;
-        functionName = "swapExactIn";
-        args = [market.poolKey, pairIsCurrency0, pairIn, slippageFloor(quotedOut, slippageBps), account];
-      }
+      value = parseEther(String(amount));
+      const leg = market.pairIsNative ? emptyEthLeg : getTestnetEthLeg({ address: market.pairAddress }, "buy");
+      const preview = await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "buyWithEth", args: [market.poolKey, leg, 0n, account], value });
+      quotedOut = preview.result;
+      functionName = "buyWithEth";
+      args = [market.poolKey, leg, slippageFloor(quotedOut, slippageBps), account];
     } else {
       const tokensIn = parseUnits(String(amount), market.decimals);
       if (tokensIn > market.tokenBalance) throw new Error("This wallet does not have enough tokens for that sale.");
@@ -426,17 +391,11 @@ export function ViralWalletProvider({ children }) {
       }
       onStage?.("quoting");
       const tokenIsCurrency0 = market.poolKey.currency0.toLowerCase() === tokenAddress.toLowerCase();
-      if (market.pairIsNative) {
-        const preview = await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "sellToEth", args: [market.poolKey, tokenIsCurrency0, tokensIn, emptyEthLeg, 0n, account] });
-        quotedOut = preview.result;
-        functionName = "sellToEth";
-        args = [market.poolKey, tokenIsCurrency0, tokensIn, emptyEthLeg, slippageFloor(quotedOut, slippageBps), account];
-      } else {
-        const preview = await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "swapExactIn", args: [market.poolKey, tokenIsCurrency0, tokensIn, 0n, account] });
-        quotedOut = preview.result;
-        functionName = "swapExactIn";
-        args = [market.poolKey, tokenIsCurrency0, tokensIn, slippageFloor(quotedOut, slippageBps), account];
-      }
+      const leg = market.pairIsNative ? emptyEthLeg : getTestnetEthLeg({ address: market.pairAddress }, "sell");
+      const preview = await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "sellToEth", args: [market.poolKey, tokenIsCurrency0, tokensIn, leg, 0n, account] });
+      quotedOut = preview.result;
+      functionName = "sellToEth";
+      args = [market.poolKey, tokenIsCurrency0, tokensIn, leg, slippageFloor(quotedOut, slippageBps), account];
     }
     onStage?.("signature");
     await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName, args, ...(value ? { value } : {}) });

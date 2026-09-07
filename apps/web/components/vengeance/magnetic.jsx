@@ -3,7 +3,7 @@
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useRef } from "react";
 
-/** Local Vengeance-style magnetic interaction, kept deliberately subtle for ViralTerminal. */
+/** Local Vengeance-style magnetic interaction, kept deliberately subtle for TRND.fun. */
 export function Magnetic({ children, className = "", strength = 1.5 }) {
   const ref = useRef(null);
   const x = useMotionValue(0);

@@ -33,11 +33,11 @@ export default function Hero() {
             <h1 className="mt-5 font-heading font-semibold text-foreground leading-[0.97] tracking-[-0.055em] text-[clamp(2.5rem,4.2vw,4.65rem)] max-w-4xl">
               The internet moves first.
               <br />
-              <span className="text-primary">ViralTerminal</span> moves with it.
+              <span className="text-foreground">TRND<span className="brand-fun">.fun</span></span> moves with it.
             </h1>
 
             <p className="mt-4 text-base text-secondarytext max-w-3xl leading-relaxed">
-              Detect emerging moments across X, TikTok, Instagram and YouTube. ViralTerminal scores their momentum, explains why they are moving, matches each narrative to the relevant real-world asset, and turns the moment into an onchain market.
+              Detect emerging moments across X, TikTok, Instagram and YouTube. TRND.fun scores their momentum, explains why they are moving, matches each narrative to the relevant real-world asset, and turns the moment into an onchain market.
             </p>
 
             <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-3">

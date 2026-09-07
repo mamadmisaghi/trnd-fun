@@ -39,12 +39,12 @@ export default function RecentLaunchesTicker() {
                   data={t.sparkline}
                   width={80}
                   height={28}
-                  color={t.change24h >= 0 ? "#A8FF00" : "#FF4D4D"}
+                  color={t.change24h >= 0 ? "#9CFF2E" : "#FF5E5E"}
                 />
               </div>
               <span
                 className="font-mono-nums text-xs font-medium shrink-0"
-                style={{ color: t.change24h >= 0 ? "#A8FF00" : "#FF4D4D" }}
+                style={{ color: t.change24h >= 0 ? "#9CFF2E" : "#FF5E5E" }}
               >
                 {t.change24h >= 0 ? "+" : ""}
                 {t.change24h.toFixed(1)}%

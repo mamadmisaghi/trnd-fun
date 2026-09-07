@@ -1,10 +1,10 @@
 {
-  "name": "ViralTerminal",
-  "short_name": "VIRAL",
+  "name": "TRND.fun",
+  "short_name": "TRND",
   "description": "Real-time cultural intelligence and onchain launch terminal for Robinhood Chain.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#080808",
-  "theme_color": "#A8FF00",
-  "icons": [{ "src": "/viral-terminal-mark.svg", "sizes": "any", "type": "image/svg+xml" }]
+  "background_color": "#040404",
+  "theme_color": "#9CFF2E",
+  "icons": [{ "src": "/brand/trnd-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
 }

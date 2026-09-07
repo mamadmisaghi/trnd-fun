@@ -1,7 +1,7 @@
 import React from "react";
 
 // A more detailed chart for the Signal detail / token market pages.
-export default function LineChart({ data = [], height = 180, color = "#A8FF00", showGrid = true, className = "" }) {
+export default function LineChart({ data = [], height = 180, color = "#9CFF2E", showGrid = true, className = "" }) {
   const width = 600;
   if (!data.length) return null;
   const min = Math.min(...data);
@@ -26,7 +26,7 @@ export default function LineChart({ data = [], height = 180, color = "#A8FF00", 
       </defs>
       {showGrid &&
         [0.25, 0.5, 0.75].map((g) => (
-          <line key={g} x1="0" y1={height * g} x2={width} y2={height * g} stroke="#202020" strokeWidth="1" strokeDasharray="2 4" />
+          <line key={g} x1="0" y1={height * g} x2={width} y2={height * g} stroke="#1C211D" strokeWidth="1" strokeDasharray="2 4" />
         ))}
       <path d={area} fill="url(#chart-fill)" />
       <path d={line} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />

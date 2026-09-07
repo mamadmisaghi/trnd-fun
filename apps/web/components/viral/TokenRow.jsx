@@ -55,7 +55,7 @@ export default function TokenRow({ token, index = 0 }) {
         )}
       </div>
       <div className="hidden xl:block">
-        <Sparkline data={token.sparkline} width={100} height={28} color={positive ? "#A8FF00" : "#FF4D4D"} />
+        <Sparkline data={token.sparkline} width={100} height={28} color={positive ? "#9CFF2E" : "#FF5E5E"} />
       </div>
       <ArrowUpRight size={15} className="hidden xl:block text-mutedtext group-hover:text-primary transition-colors justify-self-end" />
     </Link>
