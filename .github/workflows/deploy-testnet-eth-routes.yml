@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   deploy:
@@ -26,6 +26,7 @@ jobs:
       RH_TESTNET_DEPLOYER_PRIVATE_KEY: ${{ secrets.RH_TESTNET_DEPLOYER_PRIVATE_KEY }}
       EXPLORER_API_URL: https://explorer.testnet.chain.robinhood.com/api/
       FACTORY: "0x8D196Fc239AE5C364eF4E8b76A987Acd6065929C"
+      PREVIOUS_ROUTER: "0x55Bea0D582C48815585164AC476C2C0c71506B5d"
       USDG: "0x20A887523fbbF0024eB46ee672DF15A95521E680"
       RWA_TOKEN: "0xc9f9c86933092bbbfff3ccb4b105a4a94bf3bd4e"
       ADAPTER_SEED_ETH_WEI: "50000000000000000"
@@ -46,10 +47,21 @@ jobs:
         run: bash testnet-preflight.sh
 
       - name: Prevent duplicate route deployment
+        id: current
         run: |
           if [[ -f deployments/46630/eth-routes.json ]]; then
             echo "ETH route deployment is already recorded for chain 46630."
             exit 1
+          fi
+          ACTIVE=$(cast call --rpc-url "$RH_TESTNET_RPC_URL" "$FACTORY" 'launchForwarder()(address)')
+          if [[ "${ACTIVE,,}" != "${PREVIOUS_ROUTER,,}" ]]; then
+            echo "An upgraded route deployment is already active; recovering its addresses."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "router=$ACTIVE" >> "$GITHUB_OUTPUT"
+            echo "adapter=$(cast call --rpc-url "$RH_TESTNET_RPC_URL" "$ACTIVE" 'swapRouter()(address)')" >> "$GITHUB_OUTPUT"
+            echo "weth=$(cast call --rpc-url "$RH_TESTNET_RPC_URL" "$ACTIVE" 'weth()(address)')" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and test
@@ -58,6 +70,7 @@ jobs:
           forge test --no-match-path "test/fork/*"
 
       - name: Deploy and verify ETH routes
+        if: steps.current.outputs.exists != 'true'
         env:
           PRIVATE_KEY: ${{ secrets.RH_TESTNET_DEPLOYER_PRIVATE_KEY }}
         run: |
@@ -77,9 +90,15 @@ jobs:
         if: success()
         run: |
           mkdir -p deployments/46630
-          WETH=$(jq -r '.transactions[] | select(.contractName == "TestnetWrappedEther" and .transactionType == "CREATE") | .contractAddress' broadcast/DeployTestnetEthRoutes.s.sol/46630/run-latest.json | tail -1)
-          ADAPTER=$(jq -r '.transactions[] | select(.contractName == "TestnetEthQuoteAdapter" and .transactionType == "CREATE") | .contractAddress' broadcast/DeployTestnetEthRoutes.s.sol/46630/run-latest.json | tail -1)
-          ROUTER=$(jq -r '.transactions[] | select(.contractName == "PairPadRouter" and .transactionType == "CREATE") | .contractAddress' broadcast/DeployTestnetEthRoutes.s.sol/46630/run-latest.json | tail -1)
+          if [[ "${{ steps.current.outputs.exists }}" == "true" ]]; then
+            WETH="${{ steps.current.outputs.weth }}"
+            ADAPTER="${{ steps.current.outputs.adapter }}"
+            ROUTER="${{ steps.current.outputs.router }}"
+          else
+            WETH=$(jq -r '.transactions[] | select(.contractName == "TestnetWrappedEther" and .transactionType == "CREATE") | .contractAddress' broadcast/DeployTestnetEthRoutes.s.sol/46630/run-latest.json | tail -1)
+            ADAPTER=$(jq -r '.transactions[] | select(.contractName == "TestnetEthQuoteAdapter" and .transactionType == "CREATE") | .contractAddress' broadcast/DeployTestnetEthRoutes.s.sol/46630/run-latest.json | tail -1)
+            ROUTER=$(jq -r '.transactions[] | select(.contractName == "PairPadRouter" and .transactionType == "CREATE") | .contractAddress' broadcast/DeployTestnetEthRoutes.s.sol/46630/run-latest.json | tail -1)
+          fi
           ACTIVE=$(cast call --rpc-url "$RH_TESTNET_RPC_URL" "$FACTORY" 'launchForwarder()(address)')
           test "${ACTIVE,,}" = "${ROUTER,,}"
           jq -n \
@@ -94,6 +113,20 @@ jobs:
             '{chainId:$chainId,network:"Robinhood Chain Testnet",deployer:$deployer,testnetOnly:true,contracts:{wrappedEth:$wrappedEth,ethQuoteAdapter:$adapter,router:$router,factory:$factory},pairs:{USDG:$usdg,TSLA:$rwa},rates:{ETH_USDG:"4500",ETH_TSLA:"18"}}' \
             > deployments/46630/eth-routes.json
           jq . deployments/46630/eth-routes.json
+
+          sed -i "s/router: \"0x55Bea0D582C48815585164AC476C2C0c71506B5d\"/router: \"$ROUTER\"/" ../apps/web/lib/protocol/robinhood-testnet.js
+          sed -i "s/wrappedEth: process.env.NEXT_PUBLIC_TESTNET_WRAPPED_ETH || \"\"/wrappedEth: process.env.NEXT_PUBLIC_TESTNET_WRAPPED_ETH || \"$WETH\"/" ../apps/web/lib/protocol/robinhood-testnet.js
+          sed -i "s/adapter: process.env.NEXT_PUBLIC_TESTNET_ETH_ADAPTER || \"\"/adapter: process.env.NEXT_PUBLIC_TESTNET_ETH_ADAPTER || \"$ADAPTER\"/" ../apps/web/lib/protocol/robinhood-testnet.js
+
+      - name: Commit manifest and active frontend addresses
+        if: success()
+        working-directory: .
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add contracts/deployments/46630/eth-routes.json apps/web/lib/protocol/robinhood-testnet.js
+          git commit -m "ops(testnet): record active ETH routes [skip deploy-testnet-eth-routes]"
+          git push origin HEAD:main
 
       - name: Upload broadcast and deployment manifest
         if: always()
