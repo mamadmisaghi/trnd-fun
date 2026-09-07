@@ -31,6 +31,27 @@ export async function getIndexedTrades(tokenAddress) {
   return payload.data || [];
 }
 
+export async function getIndexedCandles(tokenAddress, interval = "5m") {
+  const payload = await indexerFetch(`/v1/markets/${tokenAddress}/candles?interval=${interval}&limit=120`);
+  return payload.data || [];
+}
+
+export async function getIndexedHolders(tokenAddress) {
+  const payload = await indexerFetch(`/v1/markets/${tokenAddress}/holders?limit=100`);
+  return payload.data || [];
+}
+
+export function subscribeToIndexedMarket(tokenAddress, onUpdate, onStatus = () => {}) {
+  const source = new EventSource(`${TESTNET_INDEXER_URL}/v1/stream?token=${tokenAddress}`);
+  source.addEventListener("ready", () => onStatus("connected"));
+  source.addEventListener("market.updated", (event) => {
+    onStatus("connected");
+    onUpdate(JSON.parse(event.data));
+  });
+  source.onerror = () => onStatus("reconnecting");
+  return () => source.close();
+}
+
 export async function indexTransaction(transactionHash) {
   return indexerFetch("/v1/ingest", {
     method: "POST",

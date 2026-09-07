@@ -9,3 +9,8 @@ export function rewindHeight(cursor, startBlock, rewindBlocks) {
   const candidate = cursor > rewindBlocks ? cursor - rewindBlocks : startBlock;
   return candidate < startBlock ? startBlock : candidate;
 }
+
+export function retryBackoff(failures, baseMs, maximumMs) {
+  const exponent = Math.max(0, Math.min(10, failures - 1));
+  return Math.min(maximumMs, baseMs * (2 ** exponent));
+}

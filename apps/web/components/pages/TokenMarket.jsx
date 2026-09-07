@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import SafeImage from "@/components/ui/safe-image";
 import { explorerUrl, robinhoodTestnet } from "@/lib/protocol/robinhood-testnet";
 import { shortAddress, useViralWallet } from "@/lib/protocol/ViralWalletProvider";
-import { getIndexedMarket, getIndexedTrades, indexTransaction } from "@/lib/indexer/client";
+import { getIndexedCandles, getIndexedHolders, getIndexedMarket, getIndexedTrades, indexTransaction, subscribeToIndexedMarket } from "@/lib/indexer/client";
 
 const TESTNET_GENESIS = {
   id: "testnet-genesis",
@@ -96,22 +96,36 @@ export default function TokenMarket() {
   const [lastTx, setLastTx] = useState(null);
   const [indexedMarket, setIndexedMarket] = useState(null);
   const [indexedTrades, setIndexedTrades] = useState([]);
+  const [indexedCandles, setIndexedCandles] = useState([]);
+  const [indexedHolders, setIndexedHolders] = useState([]);
+  const [indexerStatus, setIndexerStatus] = useState("idle");
   const [indexerRevision, setIndexerRevision] = useState(0);
   const wallet = useViralWallet();
   const liveTokenAddress = isAddress(token?.tokenAddress || "") ? token.tokenAddress : null;
+  const candleInterval = ({ "15M": "1m", "1H": "5m", "4H": "15m", "1D": "1h" })[timeframe];
   const chart = useMemo(() => {
-    const prices = indexedTrades.slice().reverse().map((trade) => tradePrice(trade, indexedMarket)).filter((value) => Number.isFinite(value) && value > 0);
-    return prices.length > 1 ? prices : series(Math.max(1, token?.change24h || 14));
-  }, [indexedMarket, indexedTrades, token?.change24h, timeframe]);
+    if (liveTokenAddress) return indexedCandles.map((candle) => ({
+      open: Number(candle.open), high: Number(candle.high), low: Number(candle.low), close: Number(candle.close),
+    })).filter((candle) => Object.values(candle).every((value) => Number.isFinite(value) && value > 0));
+    return series(Math.max(1, token?.change24h || 14));
+  }, [indexedCandles, liveTokenAddress, token?.change24h]);
 
   useEffect(() => {
-    if (!liveTokenAddress) { setIndexedMarket(null); setIndexedTrades([]); return; }
+    if (!liveTokenAddress) { setIndexedMarket(null); setIndexedTrades([]); setIndexedCandles([]); setIndexedHolders([]); setIndexerStatus("idle"); return; }
     let active = true;
-    Promise.all([getIndexedMarket(liveTokenAddress), getIndexedTrades(liveTokenAddress)])
-      .then(([market, trades]) => { if (active) { setIndexedMarket(market); setIndexedTrades(trades); } })
-      .catch(() => { if (active) { setIndexedMarket(null); setIndexedTrades([]); } });
+    setIndexerStatus("loading");
+    Promise.all([getIndexedMarket(liveTokenAddress), getIndexedTrades(liveTokenAddress), getIndexedCandles(liveTokenAddress, candleInterval), getIndexedHolders(liveTokenAddress)])
+      .then(([market, trades, candles, holders]) => { if (active) { setIndexedMarket(market); setIndexedTrades(trades); setIndexedCandles(candles); setIndexedHolders(holders); setIndexerStatus("live"); } })
+      .catch(() => { if (active) { setIndexedMarket(null); setIndexedTrades([]); setIndexedCandles([]); setIndexedHolders([]); setIndexerStatus("error"); } });
     return () => { active = false; };
-  }, [liveTokenAddress, indexerRevision]);
+  }, [candleInterval, liveTokenAddress, indexerRevision]);
+
+  useEffect(() => {
+    if (!liveTokenAddress) return undefined;
+    return subscribeToIndexedMarket(liveTokenAddress, () => setIndexerRevision((value) => value + 1), (status) => {
+      if (status === "reconnecting") setIndexerStatus((current) => current === "loading" ? current : "reconnecting");
+    });
+  }, [liveTokenAddress]);
 
   const refreshMarket = useCallback(async () => {
     if (!liveTokenAddress) { setMarketState(null); return; }
@@ -145,6 +159,19 @@ export default function TokenMarket() {
   const quote = marketState?.pairSymbol || token.pairAsset || "ETH";
   const displayName = marketState?.tokenName || indexedMarket?.token_name || token.name;
   const displayTicker = marketState?.tokenSymbol || indexedMarket?.token_symbol || token.ticker;
+  const onchain = Boolean(liveTokenAddress);
+  const displayPrice = onchain ? (indexedMarket?.latest_price ? formatDisplay(indexedMarket.latest_price) : "—") : token.price;
+  const displayVolume = onchain ? (indexedMarket ? `${formatDisplay(indexedMarket.quote_volume_24h)} ${quote}` : "—") : token.volume24h;
+  const displayHolders = onchain ? (indexedMarket?.holder_count ?? "—") : token.holders;
+  const displayChange = onchain ? "—" : <MetricChange value={token.change24h} />;
+  const indexedHolderRows = (() => {
+    const total = indexedHolders.reduce((sum, holder) => sum + BigInt(holder.balance), 0n);
+    return indexedHolders.slice(0, 8).map((holder, index) => ({
+      rank: index + 1,
+      address: holder.holder_address,
+      pct: total > 0n ? Number(BigInt(holder.balance) * 10_000n / total) / 100 : 0,
+    }));
+  })();
   const submitTrade = async () => {
     setTradeError("");
     if (!wallet.isConnected) { try { await wallet.connect(); } catch (error) { setTradeError(error.message); } return; }
@@ -184,23 +211,23 @@ export default function TokenMarket() {
 
       <header className="border border-border bg-card rounded-sm mb-5">
         <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-          <div className="flex items-center gap-4 min-w-0"><SafeImage src={token.image} alt="" className="w-16 h-16 border border-border shrink-0" /><div className="min-w-0"><div className="flex items-center gap-2 flex-wrap"><h1 className="text-2xl font-semibold tracking-[-0.035em] truncate">{displayName}</h1><span className={`text-[9px] border px-2 py-0.5 tracking-[0.13em] ${token.fromSignal ? "text-primary border-primary/25 bg-primary/[0.04]" : "text-secondarytext border-border-strong"}`}>{token.fromSignal ? "VIRAL ORIGIN" : "MANUAL LAUNCH"}</span></div><div className="mt-1 flex items-center gap-1.5 font-mono text-sm text-primary"><span>${displayTicker} /</span><PairAssetLogo symbol={quote} size={20} className="rounded-full" /><span>{quote}</span></div><button className="text-[11px] text-mutedtext mt-1 flex items-center gap-1 hover:text-foreground">{token.tokenAddress}<Copy size={11} /></button><div className="mt-2 flex items-center gap-4 text-[10px] text-mutedtext"><span>Creator <b className="text-secondarytext">{indexedMarket?.deployer ? shortAddress(indexedMarket.deployer) : "@viralindex"}</b></span><span>Created {token.launchTime}</span></div></div></div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-x-5 gap-y-4 xl:min-w-[760px]"><HeaderStat label="Price" value={token.price} /><HeaderStat label="24H" value={<MetricChange value={token.change24h} />} /><HeaderStat label="Market Cap" value={token.marketCap} /><HeaderStat label="FDV" value={token.marketCap} /><HeaderStat label="Liquidity" value={token.liquidity} /><HeaderStat label="24H Volume" value={token.volume24h} /><HeaderStat label="Holders" value={token.holders.toLocaleString()} /></div>
+          <div className="flex items-center gap-4 min-w-0"><SafeImage src={token.image} alt="" className="w-16 h-16 border border-border shrink-0" /><div className="min-w-0"><div className="flex items-center gap-2 flex-wrap"><h1 className="text-2xl font-semibold tracking-[-0.035em] truncate">{displayName}</h1><span className={`text-[9px] border px-2 py-0.5 tracking-[0.13em] ${token.fromSignal ? "text-primary border-primary/25 bg-primary/[0.04]" : "text-secondarytext border-border-strong"}`}>{token.fromSignal ? "VIRAL ORIGIN" : "MANUAL LAUNCH"}</span></div><div className="mt-1 flex items-center gap-1.5 font-mono text-sm text-primary"><span>${displayTicker} /</span><PairAssetLogo symbol={quote} size={20} className="rounded-full" /><span>{quote}</span></div><button className="text-[11px] text-mutedtext mt-1 flex items-center gap-1 hover:text-foreground">{token.tokenAddress}<Copy size={11} /></button><div className="mt-2 flex items-center gap-4 text-[10px] text-mutedtext"><span>Creator <b className="text-secondarytext">{indexedMarket?.deployer ? shortAddress(indexedMarket.deployer) : onchain ? "Unavailable" : "@viralindex"}</b></span><span>Created {token.launchTime}</span></div></div></div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-x-5 gap-y-4 xl:min-w-[760px]"><HeaderStat label="Price" value={displayPrice} /><HeaderStat label="24H" value={displayChange} /><HeaderStat label="Market Cap" value={onchain ? "—" : token.marketCap} /><HeaderStat label="FDV" value={onchain ? "—" : token.marketCap} /><HeaderStat label="Liquidity" value={onchain ? "LOCKED" : token.liquidity} /><HeaderStat label="24H Volume" value={displayVolume} /><HeaderStat label="Holders" value={displayHolders} /></div>
         </div>
-        <div className="px-4 sm:px-5 py-3 border-t border-border grid md:grid-cols-[1fr_360px] gap-4 text-xs"><div className="flex flex-wrap items-center gap-x-8 gap-y-2 text-mutedtext"><span>Creator fee generated <b className="font-mono-nums text-base text-foreground ml-1">$14,270</b></span><span>Created <b className="text-foreground ml-1">Jun 14, 2025 · 2:21 PM</b></span></div><p className="text-secondarytext leading-relaxed">A cultural market connected to a real internet moment and priced against {quote}.</p></div>
+        <div className="px-4 sm:px-5 py-3 border-t border-border grid md:grid-cols-[1fr_360px] gap-4 text-xs"><div className="flex flex-wrap items-center gap-x-8 gap-y-2 text-mutedtext"><span>Creator fee generated <b className="font-mono-nums text-base text-foreground ml-1">{onchain ? "—" : "$14,270"}</b></span><span>Created <b className="text-foreground ml-1">{onchain ? (indexedMarket?.block_time ? new Date(indexedMarket.block_time).toLocaleString() : "Awaiting indexer") : "Jun 14, 2025 · 2:21 PM"}</b></span></div><p className="text-secondarytext leading-relaxed">A cultural market connected to a real internet moment and priced against {quote}.</p></div>
       </header>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-5">
         <main className="space-y-5 min-w-0">
           <section className="border border-border bg-card rounded-sm p-4 sm:p-5">
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-4"><HeaderStat label="Price" value={token.price} /><HeaderStat label="Market cap" value={token.marketCap} /><HeaderStat label="Volume (24H)" value={token.volume24h} /><HeaderStat label="Liquidity" value={token.liquidity} /><HeaderStat label="Holders" value={token.holders.toLocaleString()} /></div>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-4"><HeaderStat label="Price" value={displayPrice} /><HeaderStat label="Market cap" value={onchain ? "—" : token.marketCap} /><HeaderStat label="Volume (24H)" value={displayVolume} /><HeaderStat label="Liquidity" value={onchain ? "LOCKED" : token.liquidity} /><HeaderStat label="Holders" value={displayHolders} /></div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-t border-border pt-3"><div className="flex gap-1">{["15M", "1H", "4H", "1D"].map((item) => <button key={item} onClick={() => setTimeframe(item)} className={cn("px-3 py-1.5 text-[11px] font-mono rounded-sm", timeframe === item ? "bg-primary text-primary-foreground" : "bg-deep text-mutedtext hover:text-foreground")}>{item}</button>)}</div><div className="flex items-center gap-1"><span className="px-3 py-1.5 bg-primary/[0.08] text-primary text-[10px]">PRICE</span><span className="px-3 py-1.5 bg-deep text-mutedtext text-[10px]">MARKET CAP</span></div></div>
-            <CandleChart data={chart} positive={token.change24h >= 0} />
+            <CandleChart data={chart} positive={token.change24h >= 0} emptyLabel={onchain ? indexerMessage(indexerStatus, "No confirmed swaps in this timeframe.") : null} />
           </section>
 
           <section className="grid lg:grid-cols-[minmax(0,1.8fr)_minmax(260px,1fr)] gap-5">
-            <RecentTrades trades={indexedTrades} indexedMarket={indexedMarket} fallback={activity} quote={quote} ticker={displayTicker} fallbackPrice={token.price} />
-            <div className="border border-border bg-card rounded-sm overflow-hidden"><div className="px-4 py-3 border-b border-border"><h2 className="text-sm font-semibold">Top holders</h2></div><div className="grid grid-cols-[28px_1fr_72px] gap-3 px-4 py-2 border-b border-border bg-deep/45 text-[9px] uppercase tracking-[0.1em] text-mutedtext"><span>#</span><span>Address</span><span>Share</span></div>{topHolders.slice(0, 8).map((holder) => <div key={holder.address} className="grid grid-cols-[28px_1fr_72px] gap-3 px-4 py-2.5 border-b border-border last:border-0 text-[11px] font-mono"><span className="text-mutedtext">{holder.rank}</span><span className="truncate">{holder.address}</span><span className="text-right">{holder.pct}%</span></div>)}</div>
+            <RecentTrades trades={indexedTrades} indexedMarket={indexedMarket} fallback={activity} quote={quote} ticker={displayTicker} fallbackPrice={token.price} onchain={onchain} status={indexerStatus} />
+            <div className="border border-border bg-card rounded-sm overflow-hidden"><div className="px-4 py-3 border-b border-border"><h2 className="text-sm font-semibold">Top holders</h2></div><div className="grid grid-cols-[28px_1fr_72px] gap-3 px-4 py-2 border-b border-border bg-deep/45 text-[9px] uppercase tracking-[0.1em] text-mutedtext"><span>#</span><span>Address</span><span>Share</span></div>{(onchain ? indexedHolderRows : topHolders.slice(0, 8)).map((holder) => <div key={holder.address} className="grid grid-cols-[28px_1fr_72px] gap-3 px-4 py-2.5 border-b border-border last:border-0 text-[11px] font-mono"><span className="text-mutedtext">{holder.rank}</span><span className="truncate">{holder.address}</span><span className="text-right">{holder.pct}%</span></div>)}{onchain && indexedHolderRows.length === 0 && <EmptyMarketRow label={indexerMessage(indexerStatus, "No confirmed holders indexed.")} />}</div>
           </section>
 
           {signal && (
@@ -296,16 +323,17 @@ function AboutLink({ icon: Icon, label }) { return <button className="inline-fle
 
 function tradePrice(trade, market) {
   if (!market) return NaN;
+  if (trade.price_quote_per_token != null) return Number(trade.price_quote_per_token);
   const tokenIsCurrency0 = market.token_address.toLowerCase() < market.pair_address.toLowerCase();
   const tokenRaw = BigInt(tokenIsCurrency0 ? trade.amount0 : trade.amount1);
   const pairRaw = BigInt(tokenIsCurrency0 ? trade.amount1 : trade.amount0);
-  const tokenAmount = Math.abs(Number(formatUnits(tokenRaw, 18)));
-  const pairAmount = Math.abs(Number(formatUnits(pairRaw, 18)));
+  const tokenAmount = Math.abs(Number(formatUnits(tokenRaw, market.token_decimals ?? 18)));
+  const pairAmount = Math.abs(Number(formatUnits(pairRaw, market.pair_decimals ?? 18)));
   return tokenAmount > 0 ? pairAmount / tokenAmount : NaN;
 }
 
-function RecentTrades({ trades, indexedMarket, fallback, quote, ticker, fallbackPrice }) {
-  const rows = trades.length ? trades.slice(0, 8).map((trade) => {
+function RecentTrades({ trades, indexedMarket, fallback, quote, ticker, fallbackPrice, onchain, status }) {
+  const rows = trades.length && indexedMarket ? trades.slice(0, 8).map((trade) => {
     const tokenIsCurrency0 = indexedMarket.token_address.toLowerCase() < indexedMarket.pair_address.toLowerCase();
     const tokenRaw = BigInt(tokenIsCurrency0 ? trade.amount0 : trade.amount1);
     const pairRaw = BigInt(tokenIsCurrency0 ? trade.amount1 : trade.amount0);
@@ -314,15 +342,23 @@ function RecentTrades({ trades, indexedMarket, fallback, quote, ticker, fallback
       time: `#${trade.block_number}`,
       type: tokenRaw < 0n ? "buy" : "sell",
       wallet: shortAddress(trade.sender),
-      pair: formatDisplay(Math.abs(Number(formatUnits(pairRaw, 18)))),
-      token: formatDisplay(Math.abs(Number(formatUnits(tokenRaw, 18)))),
+      pair: formatDisplay(Math.abs(Number(formatUnits(pairRaw, indexedMarket.pair_decimals ?? 18)))),
+      token: formatDisplay(Math.abs(Number(formatUnits(tokenRaw, indexedMarket.token_decimals ?? 18)))),
       price: formatDisplay(tradePrice(trade, indexedMarket)),
     };
-  }) : fallback.slice(0, 8).map((trade, index) => ({
+  }) : onchain ? [] : fallback.slice(0, 8).map((trade, index) => ({
     key: `${trade.wallet}-${index}`, time: `${trade.time} ago`, type: trade.type, wallet: trade.wallet,
     pair: (0.38 + index * 0.27).toFixed(2), token: (6482 + index * 9043).toLocaleString(), price: fallbackPrice,
   }));
-  return <div className="border border-border bg-card rounded-sm overflow-hidden"><div className="px-4 py-3 border-b border-border flex items-center justify-between"><h2 className="text-sm font-semibold">Recent trades</h2>{trades.length > 0 && <span className="text-[9px] tracking-[0.12em] text-primary">INDEXED ONCHAIN</span>}</div><div className="grid grid-cols-[60px_54px_minmax(105px,1fr)_72px_86px_90px] gap-2 px-4 py-2 border-b border-border bg-deep/45 text-[9px] uppercase tracking-[0.1em] text-mutedtext"><span>Time</span><span>Type</span><span>Wallet</span><span>{quote}</span><span>${ticker}</span><span>Price</span></div>{rows.map((trade) => <div key={trade.key} className="grid grid-cols-[60px_54px_minmax(105px,1fr)_72px_86px_90px] gap-2 px-4 py-2 border-b border-border last:border-0 text-[11px] font-mono"><span className="text-mutedtext">{trade.time}</span><span className={trade.type === "sell" ? "text-destructive" : "text-primary"}>{trade.type.toUpperCase()}</span><span className="truncate text-secondarytext">{trade.wallet}</span><span>{trade.pair}</span><span>{trade.token}</span><span>{trade.price}</span></div>)}</div>;
+  return <div className="border border-border bg-card rounded-sm overflow-hidden"><div className="px-4 py-3 border-b border-border flex items-center justify-between"><h2 className="text-sm font-semibold">Recent trades</h2>{trades.length > 0 && <span className="text-[9px] tracking-[0.12em] text-primary">INDEXED ONCHAIN</span>}</div><div className="grid grid-cols-[60px_54px_minmax(105px,1fr)_72px_86px_90px] gap-2 px-4 py-2 border-b border-border bg-deep/45 text-[9px] uppercase tracking-[0.1em] text-mutedtext"><span>Time</span><span>Type</span><span>Wallet</span><span>{quote}</span><span>${ticker}</span><span>Price</span></div>{rows.map((trade) => <div key={trade.key} className="grid grid-cols-[60px_54px_minmax(105px,1fr)_72px_86px_90px] gap-2 px-4 py-2 border-b border-border last:border-0 text-[11px] font-mono"><span className="text-mutedtext">{trade.time}</span><span className={trade.type === "sell" ? "text-destructive" : "text-primary"}>{trade.type.toUpperCase()}</span><span className="truncate text-secondarytext">{trade.wallet}</span><span>{trade.pair}</span><span>{trade.token}</span><span>{trade.price}</span></div>)}{onchain && rows.length === 0 && <EmptyMarketRow label={indexerMessage(status, "No confirmed trades indexed.")} />}</div>;
+}
+
+function EmptyMarketRow({ label }) { return <div className="px-4 py-8 text-center text-[11px] text-mutedtext">{label}</div>; }
+function indexerMessage(status, empty) {
+  if (status === "loading") return "Loading confirmed onchain data…";
+  if (status === "reconnecting") return "Live connection interrupted; reconnecting…";
+  if (status === "error") return "Confirmed onchain data is currently unavailable.";
+  return empty;
 }
 
 function stageLabel(stage) {
@@ -338,17 +374,18 @@ function formatDisplay(value) {
   return number.toLocaleString("en-US", { maximumSignificantDigits: 6 });
 }
 
-function CandleChart({ data, positive }) {
+function CandleChart({ data, positive, emptyLabel }) {
+  if (!data.length) return <div className="h-[300px] w-full border border-border bg-deep/35 flex items-center justify-center text-[11px] text-mutedtext">{emptyLabel || "No chart data."}</div>;
   const width = 900;
   const height = 300;
-  const min = Math.min(...data) * 0.9;
-  const max = Math.max(...data) * 1.08;
-  const scaleY = (value) => height - 30 - ((value - min) / (max - min || 1)) * (height - 55);
-  const candles = data.slice(0, 36).map((value, index) => {
+  const candles = typeof data[0] === "object" ? data.slice(0, 36) : data.slice(0, 36).map((value, index) => {
     const open = index ? data[index - 1] : value * 0.98;
     const close = value;
     const spread = Math.max(0.35, Math.abs(close - open) * 0.7);
     return { open, close, high: Math.max(open, close) + spread, low: Math.min(open, close) - spread };
   });
-  return <div className="h-[300px] w-full overflow-hidden border border-border bg-deep/35"><svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full"><g stroke="rgba(255,255,255,.055)" strokeWidth="1">{[1,2,3,4].map((line) => <line key={`h${line}`} x1="0" x2={width} y1={line * 60} y2={line * 60} />)}{[1,2,3,4,5].map((line) => <line key={`v${line}`} y1="0" y2={height} x1={line * 150} x2={line * 150} />)}</g>{candles.map((candle, index) => { const x = 13 + index * 24.2; const up = candle.close >= candle.open; const color = up ? "#53E67B" : "#FF4D5D"; return <g key={index}><line x1={x} x2={x} y1={scaleY(candle.high)} y2={scaleY(candle.low)} stroke={color} strokeWidth="1.4" /><rect x={x - 5} y={Math.min(scaleY(candle.open), scaleY(candle.close))} width="10" height={Math.max(3, Math.abs(scaleY(candle.open) - scaleY(candle.close)))} fill={color} rx="1" /></g>; })}<line x1="0" x2={width} y1={scaleY(data[data.length - 1])} y2={scaleY(data[data.length - 1])} stroke={positive ? "#9CFF2E" : "#FF5E5E"} strokeDasharray="4 5" opacity=".45" /></svg></div>;
+  const min = Math.min(...candles.map((candle) => candle.low)) * 0.9;
+  const max = Math.max(...candles.map((candle) => candle.high)) * 1.08;
+  const scaleY = (value) => height - 30 - ((value - min) / (max - min || 1)) * (height - 55);
+  return <div className="h-[300px] w-full overflow-hidden border border-border bg-deep/35"><svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full"><g stroke="rgba(255,255,255,.055)" strokeWidth="1">{[1,2,3,4].map((line) => <line key={`h${line}`} x1="0" x2={width} y1={line * 60} y2={line * 60} />)}{[1,2,3,4,5].map((line) => <line key={`v${line}`} y1="0" y2={height} x1={line * 150} x2={line * 150} />)}</g>{candles.map((candle, index) => { const x = 13 + index * 24.2; const up = candle.close >= candle.open; const color = up ? "#53E67B" : "#FF4D5D"; return <g key={index}><line x1={x} x2={x} y1={scaleY(candle.high)} y2={scaleY(candle.low)} stroke={color} strokeWidth="1.4" /><rect x={x - 5} y={Math.min(scaleY(candle.open), scaleY(candle.close))} width="10" height={Math.max(3, Math.abs(scaleY(candle.open) - scaleY(candle.close)))} fill={color} rx="1" /></g>; })}<line x1="0" x2={width} y1={scaleY(candles[candles.length - 1].close)} y2={scaleY(candles[candles.length - 1].close)} stroke={positive ? "#9CFF2E" : "#FF5E5E"} strokeDasharray="4 5" opacity=".45" /></svg></div>;
 }

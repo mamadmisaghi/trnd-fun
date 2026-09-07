@@ -10,7 +10,7 @@ const db = createDatabase(config.databaseUrl);
 const eventHub = createEventHub();
 const indexer = createIndexer(config, db, eventHub);
 const keeper = config.keeper.enabled ? createKeeper(config, db, indexer.client) : null;
-const api = startApi(config, db, eventHub);
+const api = startApi(config, db, eventHub, indexer);
 
 const shutdown = async () => {
   indexer.stop();
