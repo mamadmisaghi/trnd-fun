@@ -158,7 +158,7 @@ test("ranking is reproducible, excludes direct creator self-trades, and simulate
     assert.equal(result.finalized, 1);
     assert.deepEqual(finalRecipients, ["1", "2", "3", "4", "5"].map(address));
     const rankings = await db.query("SELECT rank,creator_address,score::text FROM creator_epoch_rankings ORDER BY rank");
-    assert.deepEqual(rankings.rows.map((row) => row.score), ["5", "4", "3", "2", "1"]);
+    assert.deepEqual(rankings.rows.map((row) => Number(row.score)), [5, 4, 3, 2, 1]);
   });
 });
 
