@@ -126,7 +126,7 @@ export default function TokenMarket() {
 
   if (!token) return <div className="max-w-3xl mx-auto px-4 py-32 text-center"><p className="text-secondarytext">Market not found.</p><Button as={Link} to="/explore" variant="outline" className="mt-4">Back to Markets</Button></div>;
 
-  const quote = token.pairAsset || "ETH";
+  const quote = marketState?.pairSymbol || token.pairAsset || "ETH";
   const submitTrade = async () => {
     setTradeError("");
     if (!wallet.isConnected) { try { await wallet.connect(); } catch (error) { setTradeError(error.message); } return; }
@@ -154,7 +154,9 @@ export default function TokenMarket() {
     finally { setFeeAction(""); }
   };
 
-  const payBalance = side === "buy" ? (wallet.balance ? Number(formatEther(wallet.balance)) : 0) : Number(marketState?.tokenBalanceLabel || 0);
+  const payBalance = side === "buy"
+    ? Number(marketState?.pairBalanceLabel ?? (wallet.balance ? formatEther(wallet.balance) : 0))
+    : Number(marketState?.tokenBalanceLabel || 0);
   const receiveLabel = quoteState?.formatted ? formatDisplay(quoteState.formatted) : "0";
 
   return (
@@ -204,13 +206,13 @@ export default function TokenMarket() {
             <div className="p-4">
               <div className="rounded-md border border-border bg-deep/70 p-3 focus-within:border-primary/60 transition-colors">
                 <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.12em] text-mutedtext"><span>You pay</span><span>Balance {formatDisplay(payBalance)}</span></div>
-                <div className="mt-3 flex items-center gap-3"><input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" className="min-w-0 flex-1 bg-transparent outline-none font-mono-nums text-2xl placeholder:text-mutedtext" /><div className="flex items-center gap-2 border border-border bg-card px-2.5 py-2 rounded-md shrink-0">{side === "buy" ? <PairAssetLogo symbol="ETH" size={22} className="rounded-full" /> : <SafeImage src={token.image} alt="" className="w-[22px] h-[22px] rounded-full" />}<span className="font-mono text-xs font-semibold">{side === "buy" ? "ETH" : token.ticker}</span></div></div>
+              <div className="mt-3 flex items-center gap-3"><input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" className="min-w-0 flex-1 bg-transparent outline-none font-mono-nums text-2xl placeholder:text-mutedtext" /><div className="flex items-center gap-2 border border-border bg-card px-2.5 py-2 rounded-md shrink-0">{side === "buy" ? <PairAssetLogo symbol={quote} size={22} className="rounded-full" /> : <SafeImage src={token.image} alt="" className="w-[22px] h-[22px] rounded-full" />}<span className="font-mono text-xs font-semibold">{side === "buy" ? quote : token.ticker}</span></div></div>
               </div>
               <div className="grid grid-cols-4 gap-1.5 mt-2">{[25, 50, 75, 100].map((percent) => <button key={percent} onClick={() => setAmount(((side === "buy" && percent === 100 ? payBalance * 0.94 : payBalance) * percent / 100).toFixed(side === "buy" ? 6 : 3))} className="border border-border rounded-sm py-1.5 text-[10px] text-mutedtext hover:text-primary hover:border-primary/35 transition-colors">{percent === 100 ? "MAX" : `${percent}%`}</button>)}</div>
               <div className="relative h-6"><span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full border border-border-strong bg-card flex items-center justify-center text-mutedtext"><ArrowDownUp size={13} /></span></div>
               <div className="rounded-md border border-border bg-deep/45 p-3">
                 <div className="text-[10px] uppercase tracking-[0.12em] text-mutedtext">You receive</div>
-                <div className="mt-3 flex items-center gap-3"><span className="min-w-0 flex-1 font-mono-nums text-2xl">{quoteState?.approvalRequired ? "After approval" : receiveLabel}</span><div className="flex items-center gap-2 border border-border bg-card px-2.5 py-2 rounded-md shrink-0">{side === "buy" ? <SafeImage src={token.image} alt="" className="w-[22px] h-[22px] rounded-full" /> : <PairAssetLogo symbol="ETH" size={22} className="rounded-full" />}<span className="font-mono text-xs font-semibold">{side === "buy" ? token.ticker : "ETH"}</span></div></div>
+                <div className="mt-3 flex items-center gap-3"><span className="min-w-0 flex-1 font-mono-nums text-2xl">{quoteState?.approvalRequired ? "After approval" : receiveLabel}</span><div className="flex items-center gap-2 border border-border bg-card px-2.5 py-2 rounded-md shrink-0">{side === "buy" ? <SafeImage src={token.image} alt="" className="w-[22px] h-[22px] rounded-full" /> : <PairAssetLogo symbol={quote} size={22} className="rounded-full" />}<span className="font-mono text-xs font-semibold">{side === "buy" ? token.ticker : quote}</span></div></div>
               </div>
               <div className="my-4 space-y-2 text-[11px]"><ConfigRow label="Network" value={`Robinhood Testnet · ${robinhoodTestnet.id}`} /><ConfigRow label="Protocol trading fee" value="1.00%" /><ConfigRow label="Slippage protection" value="1.00%" />{quoteState?.approvalRequired && <ConfigRow label="Token allowance" value="Approval required" />}</div>
               {tradeError && <div className="mb-3 border border-destructive/35 bg-destructive/[0.05] p-2.5 text-[11px] text-destructive leading-relaxed">{tradeError}</div>}
@@ -237,11 +239,11 @@ export default function TokenMarket() {
 
 function HeaderStat({ label, value }) { return <div><span className="text-[9px] uppercase tracking-[0.13em] text-mutedtext block">{label}</span><span className="font-mono-nums text-base xl:text-lg font-semibold leading-tight mt-1.5 block">{value}</span></div>; }
 function FeeActions({ token, market, wallet, busy, onAction, onRefresh }) {
-  const pendingEth = market ? formatDisplay(formatEther(market.pendingNative)) : "0";
+  const pendingPair = market ? formatDisplay(formatUnits(market.pendingPair, market.pairDecimals)) : "0";
   const pendingToken = market ? formatDisplay(formatUnits(market.pendingToken, market.decimals)) : "0";
-  const claimableEth = market ? formatDisplay(formatEther(market.nativeClaimable)) : "0";
+  const claimablePair = market ? formatDisplay(formatUnits(market.pairClaimable, market.pairDecimals)) : "0";
   const claimableToken = market ? formatDisplay(formatUnits(market.tokenClaimable, market.decimals)) : "0";
-  const hasPending = Boolean(market && (market.pendingNative > 0n || market.pendingToken > 0n));
+  const hasPending = Boolean(market && (market.pendingPair > 0n || market.pendingToken > 0n));
   return (
     <section className="border border-border bg-card rounded-sm overflow-hidden">
       <div className="px-4 py-3 border-b border-border flex items-center justify-between">
@@ -251,15 +253,15 @@ function FeeActions({ token, market, wallet, busy, onAction, onRefresh }) {
       <div className="p-4">
         {!market ? <p className="text-xs text-mutedtext">Fee actions appear for markets launched by the active testnet factory.</p> : <>
           <div className="grid grid-cols-2 gap-2">
-            <FeeCell label="Pool pending" value={`${pendingEth} ETH`} />
+            <FeeCell label="Pool pending" value={`${pendingPair} ${market.pairSymbol}`} />
             <FeeCell label="Pool pending" value={`${pendingToken} ${token.ticker}`} />
-            <FeeCell label="Wallet claimable" value={`${claimableEth} ETH`} accent={market.nativeClaimable > 0n} />
+            <FeeCell label="Wallet claimable" value={`${claimablePair} ${market.pairSymbol}`} accent={market.pairClaimable > 0n} />
             <FeeCell label="Wallet claimable" value={`${claimableToken} ${token.ticker}`} accent={market.tokenClaimable > 0n} />
           </div>
           <div className="mt-3 text-[10px] text-mutedtext">Recipient <span className="font-mono text-secondarytext">{shortAddress(market.launched.creatorFeeRecipient)}</span>{market.isCreator && <span className="text-primary ml-2">CONNECTED CREATOR</span>}</div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">
             <Button variant="outline" onClick={() => onAction("collect")} disabled={!hasPending || Boolean(busy)}>{busy === "collect" ? <Loader2 size={13} className="animate-spin" /> : null}Collect</Button>
-            <Button variant="outline" onClick={() => onAction("native")} disabled={!wallet.isConnected || market.nativeClaimable === 0n || Boolean(busy)}>{busy === "native" ? <Loader2 size={13} className="animate-spin" /> : null}Claim ETH</Button>
+            <Button variant="outline" onClick={() => onAction("pair")} disabled={!wallet.isConnected || market.pairClaimable === 0n || Boolean(busy)}>{busy === "pair" ? <Loader2 size={13} className="animate-spin" /> : null}Claim {market.pairSymbol}</Button>
             <Button variant="outline" onClick={() => onAction("token")} disabled={!wallet.isConnected || market.tokenClaimable === 0n || Boolean(busy)}>{busy === "token" ? <Loader2 size={13} className="animate-spin" /> : null}Claim {token.ticker}</Button>
           </div>
         </>}
