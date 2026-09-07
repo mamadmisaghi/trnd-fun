@@ -69,6 +69,16 @@ PostgreSQL database and run `npm run backfill`. Set `BACKFILL_REPORT_PATH` to
 write the final cursor, confirmed target and per-table row counts as JSON. This
 command performs no transactions and never starts the keeper.
 
+After a confirmed backfill, run `npm run reconcile`. The reconciliation is
+read-only and pinned to the versioned Robinhood testnet manifests. At the
+indexer's confirmed cursor it verifies factory launch records, every positive
+holder balance and total supply, creator-escrow claimable balances, pending LP
+fees, and every indexed Swap's bigint price/volume math. For `ZapBuy` and
+`ZapSell`, it also checks that Recent Trades stores the end-user wallet rather
+than the router. Set `RECONCILIATION_REPORT_PATH` to retain the JSON evidence.
+The manual `Indexer full backfill evidence` workflow runs both commands with
+the keeper disabled and uploads both reports.
+
 ## Container image
 
 Build with `docker build -t trnd-indexer .`. Run migrations as a one-off command

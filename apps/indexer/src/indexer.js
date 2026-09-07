@@ -7,6 +7,22 @@ const json = (value) => JSON.stringify(value, (_, item) => typeof item === "bigi
 const lower = (value) => value?.toLowerCase();
 const ZERO = "0x0000000000000000000000000000000000000000";
 
+function routedTradeKey(transactionHash, poolId) {
+  return `${lower(transactionHash)}:${lower(poolId)}`;
+}
+
+export function routedTradeSenders(protocolEvents) {
+  const senders = new Map();
+  for (const event of protocolEvents) {
+    if (event.eventName === "ZapBuy") {
+      senders.set(routedTradeKey(event.log.transactionHash, event.args.poolId), lower(event.args.buyer));
+    } else if (event.eventName === "ZapSell") {
+      senders.set(routedTradeKey(event.log.transactionHash, event.args.poolId), lower(event.args.seller));
+    }
+  }
+  return senders;
+}
+
 export function createIndexer(config, db, eventHub, logger = console, dependencies = {}) {
   const client = dependencies.client || createPublicClient({ transport: http(config.rpcUrl, { timeout: 25_000, retryCount: 3 }) });
   let stopped = false;
@@ -116,6 +132,7 @@ export function createIndexer(config, db, eventHub, logger = console, dependenci
       db.query(`SELECT pool_id,token_address,pair_token,token_decimals,pair_decimals FROM launches WHERE chain_id=$1`, [config.chainId]),
     ]);
     const protocolEvents = protocolLogs.map((log) => decode(log, protocolAbi)).filter(Boolean);
+    const routedSenders = routedTradeSenders(protocolEvents);
     const newTokens = protocolEvents.filter((event) => event.eventName === "TokenLaunched").map((event) => lower(event.args.token));
     const trackedTokens = [...new Set([...launches.rows.map((row) => lower(row.token_address)), ...newTokens])];
     const transferLogs = trackedTokens.length ? await transferLogsFor(trackedTokens, fromBlock, toBlock) : [];
@@ -158,12 +175,13 @@ export function createIndexer(config, db, eventHub, logger = console, dependenci
           await tx.query(`UPDATE launches SET creator_fee_recipient=$3 WHERE chain_id=$1 AND token_address=$2`, [config.chainId, lower(args.token), lower(args.newRecipient)]);
         } else if (eventName === "Swap") {
           const market = pools.get(lower(args.id));
+          const sender = routedSenders.get(routedTradeKey(log.transactionHash, args.id)) || lower(args.sender);
           const first = tokenIsCurrency0(market.token, market.pair);
           const volumes = tradeVolumes({ amount0: args.amount0, amount1: args.amount1, tokenIsCurrency0: first });
           const price = quotePerToken({ sqrtPriceX96: args.sqrtPriceX96, tokenIsCurrency0: first, tokenDecimals: market.tokenDecimals ?? 18, pairDecimals: market.pairDecimals ?? 18 });
           const inserted = await tx.query(`INSERT INTO trades(chain_id,pool_id,token_address,sender,amount0,amount1,sqrt_price_x96,liquidity,tick,fee,pair_address,token_is_currency0,price_quote_per_token,token_volume,quote_volume,block_number,block_time,transaction_hash,log_index)
             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) ON CONFLICT DO NOTHING RETURNING 1`,
-          [config.chainId, lower(args.id), market.token, lower(args.sender), args.amount0.toString(), args.amount1.toString(), args.sqrtPriceX96.toString(), args.liquidity.toString(), Number(args.tick), Number(args.fee), market.pair, first, price, volumes.tokenVolume.toString(), volumes.quoteVolume.toString(), log.blockNumber.toString(), block.time, log.transactionHash, log.logIndex]);
+          [config.chainId, lower(args.id), market.token, sender, args.amount0.toString(), args.amount1.toString(), args.sqrtPriceX96.toString(), args.liquidity.toString(), Number(args.tick), Number(args.fee), market.pair, first, price, volumes.tokenVolume.toString(), volumes.quoteVolume.toString(), log.blockNumber.toString(), block.time, log.transactionHash, log.logIndex]);
           if (inserted.rowCount) await upsertCandles(tx, { chainId: config.chainId, tokenAddress: market.token, price, ...volumes, blockNumber: log.blockNumber, blockTime: block.time, logIndex: log.logIndex });
           changed.add(market.token);
         } else if (eventName === "Transfer") {
