@@ -43,7 +43,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { creatorProgram, getCreator, pairAssets, pairCatalog } from "@/data";
 import { cn } from "@/lib/utils";
-import { explorerUrl } from "@/lib/protocol/robinhood-testnet";
+import { explorerUrl, getTestnetPair } from "@/lib/protocol/robinhood-testnet";
 import { shortAddress, useViralWallet } from "@/lib/protocol/ViralWalletProvider";
 import { confirmManualLaunch } from "@/lib/launchState";
 
@@ -72,7 +72,6 @@ export default function Create() {
   const [xLink, setXLink] = useState("");
   const [telegram, setTelegram] = useState("");
   const [devBuyEnabled, setDevBuyEnabled] = useState(false);
-  const [devBuyMode, setDevBuyMode] = useState("eth");
   const [devBuyPercent, setDevBuyPercent] = useState(5);
   const [devBuyAmount, setDevBuyAmount] = useState("");
   const [creatorFeeEnabled, setCreatorFeeEnabled] = useState(false);
@@ -117,12 +116,8 @@ export default function Create() {
       try { await wallet.switchNetwork(); } catch (error) { setLaunchError(error.message); }
       return;
     }
-    if (selectedPair.symbol !== "ETH") {
-      setLaunchError("The live testnet route currently supports the native ETH pair. Select ETH to launch onchain; RWA pairs remain in preview until their reference pools are registered.");
-      return;
-    }
-    if (devBuyEnabled && devBuyMode !== "eth") {
-      setLaunchError("The first live testnet route supports Creator Buy with ETH. Token-funded opening buys will be enabled with the RWA routes.");
+    if (!getTestnetPair(selectedPair.symbol)) {
+      setLaunchError(`${selectedPair.symbol} is available in the product catalog but not enabled on this testnet deployment. Choose ETH, USDG, or TSLA.`);
       return;
     }
     if (creatorFeeEnabled && creatorBuyFee !== creatorSellFee) {
@@ -136,7 +131,8 @@ export default function Create() {
     setLaunchError("");
     setPhase("submitting");
     try {
-      const result = await wallet.launchWithEth({
+      const result = await wallet.launchWithPair({
+        pairSymbol: selectedPair.symbol,
         name,
         symbol: ticker,
         logo: image,
@@ -146,7 +142,7 @@ export default function Create() {
         telegram,
         creatorFeeRecipient: feeWalletEnabled ? feeWallet : wallet.address,
         creatorFeePercent: creatorFeeEnabled ? creatorBuyFee : 0,
-        openingBuyEth: devBuyEnabled ? devBuyAmount || "0" : "0",
+        openingBuyAmount: devBuyEnabled ? devBuyAmount || "0" : "0",
       });
       confirmManualLaunch({
         tokenId: (ticker || "token").toLowerCase().replace(/[^a-z0-9]/g, ""),
@@ -333,10 +329,10 @@ export default function Create() {
               <p className="text-xs text-mutedtext max-w-2xl leading-relaxed">Optionally buy your own token at launch. The prepared flow will include this configuration when supported by the active launch route.</p>
               <div className="border border-border bg-card rounded-md p-4 mt-5">
                 <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                  <div className="flex rounded-md border border-border p-1 bg-deep"><button onClick={() => setDevBuyMode("eth")} className={cn("px-4 py-2 text-xs rounded-sm", devBuyMode === "eth" ? "bg-foreground text-background" : "text-mutedtext")}>Buy with ETH</button><button onClick={() => setDevBuyMode("token")} className={cn("px-4 py-2 text-xs rounded-sm", devBuyMode === "token" ? "bg-foreground text-background" : "text-mutedtext")}>Buy with tokens</button></div>
+                  <div className="flex rounded-md border border-border p-1 bg-deep"><span className="px-4 py-2 text-xs rounded-sm bg-foreground text-background">Buy with {selectedPair.symbol}</span></div>
                   <div className="grid grid-cols-4 gap-2 lg:ml-auto">{[1, 2, 5, 10].map((percent) => <button key={percent} onClick={() => setDevBuyPercent(percent)} className={cn("h-9 min-w-14 border text-xs font-mono rounded-sm", devBuyPercent === percent ? "border-primary bg-primary text-primary-foreground" : "border-border text-mutedtext hover:text-foreground")}>{percent}%</button>)}</div>
                 </div>
-                <div className="grid sm:grid-cols-[1fr_260px] gap-3 mt-4"><Field label={`Amount (${devBuyMode === "eth" ? "ETH" : ticker || "TOKEN"})`}><input value={devBuyAmount} onChange={(event) => setDevBuyAmount(event.target.value)} className="terminal-input font-mono" placeholder="0.0" /></Field><div className="border border-border bg-deep px-4 py-3 text-xs text-mutedtext"><div className="text-foreground font-medium">≈ {devBuyPercent}% of supply</div><div className="mt-1">Configured for the initial market transaction.</div></div></div>
+                <div className="grid sm:grid-cols-[1fr_260px] gap-3 mt-4"><Field label={`Amount (${selectedPair.symbol})`}><input value={devBuyAmount} onChange={(event) => setDevBuyAmount(event.target.value)} className="terminal-input font-mono" placeholder="0.0" /></Field><div className="border border-border bg-deep px-4 py-3 text-xs text-mutedtext"><div className="text-foreground font-medium">Creator Buy in paired asset</div><div className="mt-1">Your wallet approves {selectedPair.symbol} first when it is an ERC-20 pair.</div></div></div>
               </div>
             </RevealPanel>
           </LaunchSection>
