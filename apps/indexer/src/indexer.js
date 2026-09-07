@@ -93,7 +93,7 @@ export function createIndexer(config, db, eventHub, logger = console, dependenci
 
   async function launchMetadata(token, pair) {
     const [tokenData, pairData, record] = await Promise.all([
-      metadata(token), metadata(pair),
+      metadata(token), lower(pair) === ZERO ? Promise.resolve({ name: "Ether", symbol: "ETH", decimals: 18 }) : metadata(pair),
       client.readContract({ address: config.contracts.factory, abi: factoryViewAbi, functionName: "getLaunchedToken", args: [token] }),
     ]);
     return { token: { ...tokenData, creatorFeeRecipient: record.creatorFeeRecipient }, pair: pairData };
