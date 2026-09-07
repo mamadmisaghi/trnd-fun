@@ -18,19 +18,10 @@ export const robinhoodTestnet = defineChain({
 
 export const protocolContracts = {
   launchFactory: "0x8D196Fc239AE5C364eF4E8b76A987Acd6065929C",
-  router: "0xc3e36d0c7374dee38a092356a59e0829404729e9",
+  router: "0x55Bea0D582C48815585164AC476C2C0c71506B5d",
   pairRegistry: "0x8e84B45d98A2b8233Aa1bA8BB16b6678E1C947aa",
   launchLocker: "0x0CB8026DB8122b2454cd29aF31E1172b3cA39739",
   feeEscrow: "0xCA093138A86Ab9aA4f4aB7bE112F6B0a106c8722",
-};
-
-// Populated by the versioned Robinhood-testnet ETH-route deployment. These
-// addresses intentionally belong to the collateralized test adapter; mainnet
-// configuration must use canonical WETH and SwapRouter02 routes instead.
-export const testnetEthRouteContracts = {
-  wrappedEth: process.env.NEXT_PUBLIC_TESTNET_WRAPPED_ETH || "0x78a01a9b91ad157867ffcaf9b93c38dd83221976",
-  adapter: process.env.NEXT_PUBLIC_TESTNET_ETH_ADAPTER || "0xcc4375d3ff3a8048bdd50c1500593cf395f7ac68",
-  fee: 500,
 };
 
 export const nativePairAddress = "0x0000000000000000000000000000000000000000";
@@ -43,29 +34,6 @@ export const testnetPairAssets = {
 
 export function getTestnetPair(symbol) {
   return testnetPairAssets[String(symbol || "").toUpperCase()] || null;
-}
-
-function encodeOneHopPath(tokenIn, tokenOut, fee) {
-  if (!/^0x[0-9a-fA-F]{40}$/.test(tokenIn || "") || !/^0x[0-9a-fA-F]{40}$/.test(tokenOut || "")) {
-    throw new Error("The Robinhood testnet ETH route has not been deployed yet.");
-  }
-  return `0x${tokenIn.slice(2)}${Number(fee).toString(16).padStart(6, "0")}${tokenOut.slice(2)}`;
-}
-
-export function getTestnetEthLeg(pairOrAddress, direction = "buy") {
-  const pair = typeof pairOrAddress === "string" && pairOrAddress.startsWith("0x")
-    ? { address: pairOrAddress, type: pairOrAddress === nativePairAddress ? "NATIVE" : "ERC20" }
-    : pairOrAddress;
-  if (!pair || pair.type === "NATIVE" || pair.address === nativePairAddress) return { v3Path: "0x", v4Hops: [] };
-  const buy = direction === "buy";
-  return {
-    v3Path: encodeOneHopPath(
-      buy ? testnetEthRouteContracts.wrappedEth : pair.address,
-      buy ? pair.address : testnetEthRouteContracts.wrappedEth,
-      testnetEthRouteContracts.fee,
-    ),
-    v4Hops: [],
-  };
 }
 
 export const launchFactoryAbi = [
