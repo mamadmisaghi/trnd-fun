@@ -1,0 +1,20 @@
+{
+  "chainId": 46630,
+  "network": "Robinhood Chain Testnet",
+  "deployer": "0x66B6c5e00B1242B9681BCB3bC3bCc3C87C138CaE",
+  "testnetOnly": true,
+  "contracts": {
+    "wrappedEth": "0x78a01a9b91ad157867ffcaf9b93c38dd83221976",
+    "ethQuoteAdapter": "0xcc4375d3ff3a8048bdd50c1500593cf395f7ac68",
+    "router": "0xc3e36d0c7374dee38a092356a59e0829404729e9",
+    "factory": "0x8D196Fc239AE5C364eF4E8b76A987Acd6065929C"
+  },
+  "pairs": {
+    "USDG": "0x20A887523fbbF0024eB46ee672DF15A95521E680",
+    "TSLA": "0xc9f9c86933092bbbfff3ccb4b105a4a94bf3bd4e"
+  },
+  "rates": {
+    "ETH_USDG": "4500",
+    "ETH_TSLA": "18"
+  }
+}
