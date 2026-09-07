@@ -2,7 +2,7 @@ export const TESTNET_INDEXER_URL = "https://viral-terminal-testnet-api.gofivahoo
 
 async function indexerFetch(path, options = {}) {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 8_000);
+  const timeout = window.setTimeout(() => controller.abort(), 20_000);
   try {
     const response = await fetch(`${TESTNET_INDEXER_URL}${path}`, {
       cache: "no-store",

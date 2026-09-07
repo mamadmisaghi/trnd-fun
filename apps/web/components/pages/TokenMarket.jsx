@@ -96,6 +96,7 @@ export default function TokenMarket() {
   const [lastTx, setLastTx] = useState(null);
   const [indexedMarket, setIndexedMarket] = useState(null);
   const [indexedTrades, setIndexedTrades] = useState([]);
+  const [indexerRevision, setIndexerRevision] = useState(0);
   const wallet = useViralWallet();
   const liveTokenAddress = isAddress(token?.tokenAddress || "") ? token.tokenAddress : null;
   const chart = useMemo(() => {
@@ -110,7 +111,7 @@ export default function TokenMarket() {
       .then(([market, trades]) => { if (active) { setIndexedMarket(market); setIndexedTrades(trades); } })
       .catch(() => { if (active) { setIndexedMarket(null); setIndexedTrades([]); } });
     return () => { active = false; };
-  }, [liveTokenAddress, lastTx]);
+  }, [liveTokenAddress, indexerRevision]);
 
   const refreshMarket = useCallback(async () => {
     if (!liveTokenAddress) { setMarketState(null); return; }
@@ -153,7 +154,7 @@ export default function TokenMarket() {
     try {
       const result = await wallet.tradeEthMarket({ tokenAddress: liveTokenAddress, side, amount, slippageBps: 100, onStage: setTxStage });
       setLastTx(result.hash);
-      await indexTransaction(result.hash).catch(() => null);
+      indexTransaction(result.hash).then(() => setIndexerRevision((value) => value + 1)).catch(() => {});
       setTxState("success");
       setAmount("");
       setQuoteState(null);
