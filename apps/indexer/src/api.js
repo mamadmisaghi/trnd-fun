@@ -41,7 +41,7 @@ const marketSelect = `
     WHERE h.chain_id=l.chain_id AND h.token_address=l.token_address AND h.balance>0
   ) holders ON true`;
 
-export function startApi(config, db, eventHub) {
+export function startApi(config, db, eventHub, indexer = null) {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
     if (req.method === "OPTIONS") {
@@ -51,16 +51,35 @@ export function startApi(config, db, eventHub) {
     if (req.method !== "GET") return send(res, 405, { error: "method_not_allowed" }, config.corsOrigin);
     try {
       if (url.pathname === "/health") {
+        await db.query("SELECT 1");
         const state = await db.query(`SELECT cursor_block,cursor_block_hash,updated_at FROM indexer_state WHERE chain_id=$1`, [config.chainId]);
-        return send(res, 200, { ok: true, chainId: config.chainId, indexer: state.rows[0] || null, subscribers: eventHub?.size || 0 }, config.corsOrigin);
+        return send(res, 200, { ok: true, chainId: config.chainId, indexer: state.rows[0] || null, runtime: indexer?.status?.() || null, subscribers: eventHub?.size || 0 }, config.corsOrigin);
+      }
+      if (url.pathname === "/ready") {
+        if (!indexer?.client) return send(res, 503, { ready: false, reason: "chain_client_unavailable" }, config.corsOrigin);
+        const [state, head] = await Promise.all([
+          db.query(`SELECT cursor_block,cursor_block_hash,updated_at FROM indexer_state WHERE chain_id=$1`, [config.chainId]),
+          indexer.client.getBlockNumber(),
+        ]);
+        const row = state.rows[0];
+        if (!row) return send(res, 503, { ready: false, reason: "indexer_state_missing" }, config.corsOrigin);
+        const target = head > config.confirmations ? head - config.confirmations : 0n;
+        const cursor = BigInt(row.cursor_block);
+        const lagBlocks = target > cursor ? target - cursor : 0n;
+        const ready = Boolean(row.cursor_block_hash) && lagBlocks <= config.readinessMaxLagBlocks && (indexer.status?.().consecutiveFailures || 0) === 0;
+        return send(res, ready ? 200 : 503, { ready, chainId: config.chainId, head: head.toString(), confirmedTarget: target.toString(), cursor: cursor.toString(), lagBlocks: lagBlocks.toString(), maximumLagBlocks: config.readinessMaxLagBlocks.toString(), runtime: indexer.status?.() || null }, config.corsOrigin);
       }
       if (url.pathname === "/v1/stream") {
         const token = url.searchParams.get("token")?.toLowerCase();
         if (token && !addressPattern.test(token)) return send(res, 400, { error: "invalid_token" }, config.corsOrigin);
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache, no-transform", connection: "keep-alive", "x-accel-buffering": "no", ...corsHeaders(config.corsOrigin) });
-        res.write(`event: ready\ndata: ${JSON.stringify({ chainId: config.chainId })}\n\n`);
+        const state = await db.query(`SELECT cursor_block FROM indexer_state WHERE chain_id=$1`, [config.chainId]);
+        res.write(`retry: ${config.sseRetryMs}\nevent: ready\ndata: ${JSON.stringify({ chainId: config.chainId, cursorBlock: state.rows[0]?.cursor_block || null, confirmedOnly: true })}\n\n`);
         const unsubscribe = eventHub?.subscribe((event) => {
-          if (!token || !event.tokenAddress || event.tokenAddress === token) res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+          if (event.confirmed === true && (!token || !event.tokenAddress || event.tokenAddress === token)) {
+            const id = event.blockNumber ? `id: ${event.blockNumber}\n` : "";
+            res.write(`${id}event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+          }
         });
         const heartbeat = setInterval(() => res.write(`: heartbeat ${Date.now()}\n\n`), config.sseHeartbeatMs);
         req.on("close", () => { clearInterval(heartbeat); unsubscribe?.(); });

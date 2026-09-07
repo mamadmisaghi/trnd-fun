@@ -1,7 +1,7 @@
 import { createPublicClient, decodeEventLog, http } from "viem";
 import { factoryViewAbi, protocolAbi, swapEvent, tokenAbi, transferEvent } from "./abi.js";
 import { applyTransfer, quotePerToken, tokenIsCurrency0, tradeVolumes, upsertCandles } from "./market-store.js";
-import { nextRange, rewindHeight } from "./ranges.js";
+import { nextRange, retryBackoff, rewindHeight } from "./ranges.js";
 
 const json = (value) => JSON.stringify(value, (_, item) => typeof item === "bigint" ? item.toString() : item);
 const lower = (value) => value?.toLowerCase();
@@ -24,8 +24,9 @@ export function routedTradeSenders(protocolEvents) {
 }
 
 export function createIndexer(config, db, eventHub, logger = console, dependencies = {}) {
-  const client = dependencies.client || createPublicClient({ transport: http(config.rpcUrl, { timeout: 25_000, retryCount: 3 }) });
+  const client = dependencies.client || createPublicClient({ transport: http(config.rpcUrl, { timeout: 25_000, retryCount: config.rpcRetryCount, retryDelay: config.rpcRetryDelayMs }) });
   let stopped = false;
+  const runtime = { consecutiveFailures: 0, lastSuccessAt: null, lastErrorAt: null, lastCursor: null, lastTarget: null };
 
   async function ensureState() {
     await db.query(`INSERT INTO indexer_state(chain_id,cursor_block) VALUES($1,$2) ON CONFLICT(chain_id) DO NOTHING`, [config.chainId, (config.startBlock - 1n).toString()]);
@@ -76,7 +77,7 @@ export function createIndexer(config, db, eventHub, logger = console, dependenci
       await rebuildDerivedData(tx);
       await tx.query(`UPDATE indexer_state SET cursor_block=$2,cursor_block_hash=$3,updated_at=now() WHERE chain_id=$1`, [config.chainId, nextCursor.toString(), previous?.hash || null]);
     });
-    eventHub?.publish({ type: "chain.reorg", chainId: config.chainId, resumeBlock: resume.toString() });
+    eventHub?.publish({ type: "chain.reorg", chainId: config.chainId, resumeBlock: resume.toString(), confirmed: true });
     logger.warn(`Reorg detected; rewound to block ${nextCursor}.`);
     return { cursor: nextCursor, hash: previous?.hash || null };
   }
@@ -204,7 +205,7 @@ export function createIndexer(config, db, eventHub, logger = console, dependenci
       const checkpoint = blocks.get(String(toBlock));
       await tx.query(`UPDATE indexer_state SET cursor_block=$2,cursor_block_hash=$3,updated_at=now() WHERE chain_id=$1`, [config.chainId, toBlock.toString(), checkpoint.hash]);
     });
-    for (const tokenAddress of changed) eventHub?.publish({ type: "market.updated", chainId: config.chainId, tokenAddress, blockNumber: toBlock.toString() });
+    for (const tokenAddress of changed) eventHub?.publish({ type: "market.updated", chainId: config.chainId, tokenAddress, blockNumber: toBlock.toString(), confirmed: true });
     return events.length;
   }
 
@@ -225,10 +226,22 @@ export function createIndexer(config, db, eventHub, logger = console, dependenci
 
   async function run() {
     while (!stopped) {
-      try { await syncOnce(); } catch (error) { logger.error(error); }
-      if (!stopped) await new Promise((resolve) => setTimeout(resolve, config.pollMs));
+      let waitMs = config.pollMs;
+      try {
+        const completed = await syncOnce();
+        runtime.consecutiveFailures = 0;
+        runtime.lastSuccessAt = new Date().toISOString();
+        runtime.lastCursor = completed.cursor.toString();
+        runtime.lastTarget = completed.target.toString();
+      } catch (error) {
+        runtime.consecutiveFailures += 1;
+        runtime.lastErrorAt = new Date().toISOString();
+        waitMs = retryBackoff(runtime.consecutiveFailures, config.pollMs, config.rpcMaxBackoffMs);
+        logger.error(JSON.stringify({ event: "indexer.sync_failed", failures: runtime.consecutiveFailures, retryInMs: waitMs, errorType: error?.name || "Error", errorCode: error?.code || null }));
+      }
+      if (!stopped) await new Promise((resolve) => setTimeout(resolve, waitMs));
     }
   }
 
-  return { run, syncOnce, ingestRange, stop: () => { stopped = true; }, client };
+  return { run, syncOnce, ingestRange, stop: () => { stopped = true; }, client, status: () => ({ ...runtime }) };
 }

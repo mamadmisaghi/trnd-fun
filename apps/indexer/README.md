@@ -23,6 +23,7 @@ mismatch. Inserts are idempotent by `(chain_id, transaction_hash, log_index)`.
 ## Read API
 
 - `GET /health`
+- `GET /ready` (confirmed cursor, chain head, lag and runtime failure state)
 - `GET /v1/markets?limit=50`
 - `GET /v1/markets/:token`
 - `GET /v1/markets/:token/trades?limit=100`
