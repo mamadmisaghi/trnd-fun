@@ -1,6 +1,6 @@
-# ViralTerminal
+# TRND.fun
 
-A Next.js App Router conversion of the published ViralTerminal prototype. The visual system, routes, terminal layout, live-feed interactions and current mock content have been preserved, while Base44-specific application code has been removed.
+A Next.js App Router conversion of the published TRND.fun prototype. The visual system, routes, terminal layout, live-feed interactions and current mock content have been preserved, while Base44-specific application code has been removed.
 
 ## Stack
 
@@ -46,7 +46,7 @@ npm start
 
 ```text
 app/                       Next.js route boundaries
-components/pages/          Route surfaces retained from the current ViralTerminal UI
+components/pages/          Route surfaces retained from the current TRND.fun UI
 components/viral/          Shared terminal components and shell
 components/ui/             shadcn/ui primitives used by the UI
 components/aceternity/     Local terminal-grid interaction primitive
@@ -61,7 +61,7 @@ lib/navigation.jsx         Transitional Next navigation adapter for retained UI 
 
 UI components do not fetch data directly. Replace `data/mock/viral-terminal.js` with server-side repository modules or typed API clients, keeping their exported domain shapes while the backend is being introduced. Replace `lib/launchState.js` with authoritative reservation and launch endpoints before production. API secrets go only in server-side environment variables; `.env.example` intentionally contains names only.
 
-The scanner, market history, portfolio and creator analytics remain mock-backed. Manual Create and Signal Launch now support a real native-ETH testnet launch through the deployed ViralTerminal router, including wallet connection, network switching, live launch economics, preflight simulation, optional atomic Creator Buy and receipt confirmation. RWA routes, live trading, pair synchronization and creator fee claims remain separate integration workstreams.
+The scanner, market history, portfolio and creator analytics remain mock-backed. Manual Create and Signal Launch now support a real native-ETH testnet launch through the deployed TRND.fun router, including wallet connection, network switching, live launch economics, preflight simulation, optional atomic Creator Buy and receipt confirmation. RWA routes, live trading, pair synchronization and creator fee claims remain separate integration workstreams.
 
 ## Robinhood Chain Testnet
 

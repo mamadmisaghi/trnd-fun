@@ -1,18 +1,15 @@
-# ViralTerminal implementation status
+# TRND.fun implementation status
 
-Updated: 2026-09-06 UTC
+Updated: 2026-09-07 UTC
 
 ## Current release gate
 
-**Not ready for Robinhood Chain testnet deployment yet.** The repository has a
-reproducible PairPad/PAR-derived launch baseline, but the ViralTerminal-specific
-economics are being integrated in phases. Deploying the baseline now would
-publish fee behavior that does not match the product specification.
+**Testnet integration exists; production/mainnet is not approved.** The core and ETH-route stacks have been deployed and verified on Robinhood Chain testnet, an end-to-end launch/buy/sell/collect/claim smoke flow succeeded, and the first PostgreSQL indexer/market/keeper foundation is on main at commit `9a5c6f6d09c46e8ea41f4771801eddbcc811e838`. Full PostgreSQL/reorg/backfill validation, production routing, Viral Engine, operational hardening, multisigs, and an independent audit remain release gates. See `CODEX_HANDOFF.md` for the current continuation plan and exact approved UI provenance.
 
 ## Completed
 
 - Imported and pinned the launch/pool/locker/router baseline.
-- Documented the ViralTerminal onchain specification.
+- Documented the TRND.fun onchain specification.
 - Implemented the 24-hour top-five `ViralRewardVault` with 40/25/15/12/8
   weights and pull-based claims.
 - Implemented `ViralFeeSplitter` for the fixed 50/20/10/20 base-fee policy.
@@ -43,7 +40,7 @@ publish fee behavior that does not match the product specification.
 
 ## Required before testnet broadcast
 
-1. Snapshot the final ViralTerminal fee terms in every launch record.
+1. Snapshot the final TRND.fun fee terms in every launch record.
 2. Load faucet RWA assets into the curated pair registry with explicit launch
    economics for testnet.
 3. Replace remaining PairPad names and PAR/PONS-specific assumptions.
