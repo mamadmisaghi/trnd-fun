@@ -8,7 +8,8 @@
     "start": "node src/main.js",
     "migrate": "node src/migrate.js",
     "test": "node --test test/*.test.js",
-    "test:postgres": "node --test integration/postgres-migrations.integration.js",
+    "test:postgres": "node --test integration/*.integration.js",
+    "backfill": "node scripts/backfill.js",
     "test:chain": "node scripts/smoke-chain.js"
   },
   "dependencies": {

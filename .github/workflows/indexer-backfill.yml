@@ -1,0 +1,50 @@
+name: Indexer full backfill evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: trnd
+          POSTGRES_PASSWORD: trnd
+          POSTGRES_DB: trnd_backfill
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U trnd -d trnd_backfill"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://trnd:trnd@localhost:5432/trnd_backfill
+      RPC_URL: https://rpc.testnet.chain.robinhood.com
+      CHAIN_ID: 46630
+      START_BLOCK: 114104980
+      CONFIRMATIONS: 4
+      BLOCK_BATCH_SIZE: 1000
+      KEEPER_ENABLED: "false"
+      BACKFILL_REPORT_PATH: backfill-report.json
+    defaults:
+      run:
+        working-directory: apps/indexer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - run: npm run migrate
+      - run: npm run backfill
+      - uses: actions/upload-artifact@v4
+        with:
+          name: robinhood-testnet-backfill-evidence
+          path: apps/indexer/backfill-report.json
+          if-no-files-found: error

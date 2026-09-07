@@ -7,8 +7,8 @@ const json = (value) => JSON.stringify(value, (_, item) => typeof item === "bigi
 const lower = (value) => value?.toLowerCase();
 const ZERO = "0x0000000000000000000000000000000000000000";
 
-export function createIndexer(config, db, eventHub, logger = console) {
-  const client = createPublicClient({ transport: http(config.rpcUrl, { timeout: 25_000, retryCount: 3 }) });
+export function createIndexer(config, db, eventHub, logger = console, dependencies = {}) {
+  const client = dependencies.client || createPublicClient({ transport: http(config.rpcUrl, { timeout: 25_000, retryCount: 3 }) });
   let stopped = false;
 
   async function ensureState() {
@@ -202,6 +202,7 @@ export function createIndexer(config, db, eventHub, logger = console) {
       current = { cursor: range.toBlock, hash: checkpoint.hash };
       logger.info(`Indexed ${range.fromBlock}-${range.toBlock}: ${count} events.`);
     }
+    return { cursor: current.cursor, cursorBlockHash: current.hash, target };
   }
 
   async function run() {

@@ -59,6 +59,16 @@ the migrations is idempotent. Set `TEST_DATABASE_URL` to run the same disposable
 schema integration tests locally; the test deletes only its randomly named
 temporary schemas.
 
+The PostgreSQL integration suite also runs a complete synthetic chain history
+from the configured first block through its confirmed head, restarts against the
+same database, and then replaces the confirmed tail with a simulated fork. Its
+post-reorg state must exactly match a clean backfill of the replacement chain.
+
+For an evidence-producing backfill against Robinhood testnet, migrate an empty
+PostgreSQL database and run `npm run backfill`. Set `BACKFILL_REPORT_PATH` to
+write the final cursor, confirmed target and per-table row counts as JSON. This
+command performs no transactions and never starts the keeper.
+
 ## Container image
 
 Build with `docker build -t trnd-indexer .`. Run migrations as a one-off command
