@@ -3,7 +3,7 @@
 ## Rule zero
 
 No mainnet deployment is authorized by a successful build or test suite. The
-upstream baseline is unaudited and ViralTerminal changes create a new system that
+upstream baseline is unaudited and TRND.fun changes create a new system that
 must be independently reviewed.
 
 ## Phase 0 — Reproduce

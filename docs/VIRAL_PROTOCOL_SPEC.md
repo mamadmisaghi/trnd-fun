@@ -1,4 +1,4 @@
-# ViralTerminal Protocol Specification
+# TRND.fun Protocol Specification
 
 Status: draft implementation specification  
 Network target: Robinhood Chain  
@@ -7,7 +7,7 @@ Hook policy for V1: no custom hook
 
 ## 1. Scope
 
-V1 is the onchain launch and trading layer of ViralTerminal. The Viral Engine,
+V1 is the onchain launch and trading layer of TRND.fun. The Viral Engine,
 signal scoring, RWA recommendations, signal provenance, creator leaderboard,
 and UI data are offchain systems and are not security-critical launch
 restrictions.
@@ -94,7 +94,7 @@ For a non-ETH quote such as NVDA, an approved route performs:
 `ETH -> NVDA -> launched token`
 
 The route conversion fee on `ETH -> NVDA` belongs to the external route/pool.
-The ViralTerminal pool fee applies to `NVDA -> launched token`. The entire
+The TRND.fun pool fee applies to `NVDA -> launched token`. The entire
 operation must revert if route validation or `minAmountOut` fails.
 
 ## 7. Treasury policy

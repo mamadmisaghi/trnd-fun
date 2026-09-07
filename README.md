@@ -1,15 +1,16 @@
-# ViralTerminal Protocol (development baseline)
+# TRND.fun Protocol
 
-This repository is the development workspace for the independent ViralTerminal
+This repository is the development workspace for the independent TRND.fun
 launch protocol on Robinhood Chain. It currently preserves the upstream PAR
-contracts as a reproducible, MIT-licensed baseline while ViralTerminal-specific
+contracts as a reproducible, MIT-licensed baseline while TRND.fun-specific
 contracts, economics, tests, and deployment controls are developed.
 
-**Status:** local research and test development only. Nothing in this repository
-is approved for mainnet deployment. The upstream contracts are explicitly
-unaudited, and ViralTerminal changes require independent review and audit.
+**Status:** TRND.fun has a working Robinhood Chain testnet launch/trade/fee flow and a production-oriented indexer foundation. It is not approved for mainnet or real funds. Independent audit, multisig operations, full data validation, and the release gates remain mandatory.
 
 Project documents:
+
+- [`CODEX_HANDOFF.md`](CODEX_HANDOFF.md) — authoritative continuation handoff
+- [`AGENTS.md`](AGENTS.md) — repository operating rules
 
 - [`docs/VIRAL_PROTOCOL_SPEC.md`](docs/VIRAL_PROTOCOL_SPEC.md)
 - [`docs/SECURITY_AND_RELEASE_PLAN.md`](docs/SECURITY_AND_RELEASE_PLAN.md)
