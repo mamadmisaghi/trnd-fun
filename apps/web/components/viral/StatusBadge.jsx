@@ -14,7 +14,7 @@ export function StatusBadge({ status, className = "" }) {
       )}
       style={{
         color: s.color,
-        borderColor: status === "NEW" ? "#292929" : `${s.color}33`,
+        borderColor: status === "NEW" ? "#283129" : `${s.color}33`,
         background: status === "NEW" ? "transparent" : `${s.color}0d`,
       }}
     >

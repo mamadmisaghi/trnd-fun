@@ -12,7 +12,7 @@ export default function ProjectMetrics() {
     { label: "Launch volume", value: "$48.2M", detail: "Tracked markets" },
     { label: "Active o1 pairs", value: pairCatalog.activeCount, detail: "Current sync" },
     { label: "Source coverage", value: "4", detail: "X · TikTok · IG · YT" },
-    { label: "Total VIRAL burn", value: "38.6M", detail: "VIRAL bought & burned" },
+    { label: "Total TRND burn", value: "38.6M", detail: "TRND bought & burned" },
     { label: "Creator fees paid", value: "$7.36M", detail: "Claimed by creators" },
   ];
   return (

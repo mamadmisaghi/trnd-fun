@@ -16,7 +16,7 @@ export function MetricChange({ value, className = "" }) {
   return (
     <span
       className={cn("inline-flex items-center gap-0.5 font-mono-nums tabular text-xs font-medium", className)}
-      style={{ color: positive ? "#A8FF00" : "#FF4D4D" }}
+      style={{ color: positive ? "#9CFF2E" : "#FF5E5E" }}
     >
       {positive ? "+" : ""}
       {typeof value === "number" ? value.toFixed(1) : value}%

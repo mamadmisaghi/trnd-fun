@@ -53,7 +53,7 @@ const navigation = [
     items: [
       ["Trading fee", "trading-fee"],
       ["Creator rewards", "creator-rewards"],
-      ["VIRAL buyback", "viral-buyback"],
+      ["TRND buyback", "viral-buyback"],
     ],
   },
   {
@@ -83,7 +83,7 @@ const eventStates = ["NEW", "EARLY", "HEATING", "BREAKING", "VIRAL", "COOLING", 
 
 const faq = [
   [
-    "Is ViralTerminal a normal token launchpad?",
+    "Is TRND.fun a normal token launchpad?",
     "No. The primary product is real-time cultural intelligence. Launching is the action that follows discovery, scoring and financial matching.",
   ],
   [
@@ -92,14 +92,14 @@ const faq = [
   ],
   [
     "Can the same social post be launched more than once?",
-    "No. A normalized platform and source-post ID identify one Viral Event, and one event can produce only one ViralTerminal launch.",
+    "No. A normalized platform and source-post ID identify one Viral Event, and one event can produce only one TRND.fun launch.",
   ],
   [
     "Are all pair assets permanently available?",
     "No. The active pair catalog and launch configuration must be synchronized dynamically from launch infrastructure. A displayed pair count is only a current snapshot.",
   ],
   [
-    "Does ViralTerminal sign transactions for users?",
+    "Does TRND.fun sign transactions for users?",
     "No. Launch preparation may happen through backend infrastructure, but the connected wallet remains the creator and signer. Private keys are never requested or stored.",
   ],
 ];
@@ -135,7 +135,7 @@ export default function Docs() {
       <div className="border-b border-border bg-deep/35">
         <div className="max-w-[1640px] mx-auto px-4 sm:px-6 py-3 flex items-center gap-2 text-xs text-mutedtext">
           <BookOpen size={14} className="text-primary" />
-          <span>ViralTerminal Docs</span>
+          <span>TRND.fun Docs</span>
           <ChevronRight size={12} />
           <span className="text-secondarytext">Product overview</span>
           <span className="ml-auto hidden sm:inline-flex items-center gap-2 text-primary">
@@ -165,12 +165,12 @@ export default function Docs() {
           </div>
 
           <section id="introduction" className="docs-section scroll-mt-28">
-            <Eyebrow icon={Radio}>VIRAL INTELLIGENCE PROTOCOL</Eyebrow>
+            <Eyebrow icon={Radio}>TRND INTELLIGENCE PROTOCOL</Eyebrow>
             <h1 className="mt-5 font-heading font-semibold text-4xl sm:text-5xl lg:text-[3.5rem] tracking-[-0.055em] leading-[0.98] text-foreground">
               Internet attention,<br />mapped to markets.
             </h1>
             <p className="mt-6 text-base sm:text-lg text-secondarytext leading-8 max-w-3xl">
-              ViralTerminal detects what the internet is beginning to care about, scores the event, matches its narrative to relevant real-world assets and opens a path to launch that moment as an onchain market on Robinhood Chain.
+              TRND.fun detects what the internet is beginning to care about, scores the event, matches its narrative to relevant real-world assets and opens a path to launch that moment as an onchain market on Robinhood Chain.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/live" className="h-10 px-4 inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground text-sm font-medium">
@@ -185,7 +185,7 @@ export default function Docs() {
             </Notice>
           </section>
 
-          <Section id="how-it-works" index="01" title="How it works" intro="ViralTerminal combines a scanner, an intelligence layer and a launch engine in one continuous workflow.">
+          <Section id="how-it-works" index="01" title="How it works" intro="TRND.fun combines a scanner, an intelligence layer and a launch engine in one continuous workflow.">
             <div className="grid sm:grid-cols-2 gap-3">
               <FlowCard icon={Radio} step="SCAN" text="Monitor X, TikTok, Instagram, YouTube and news for emerging or high-authority events." />
               <FlowCard icon={Gauge} step="SCORE" text="Measure velocity, acceleration, anomaly, reach, authority, novelty and spread." />
@@ -235,7 +235,7 @@ export default function Docs() {
             </Notice>
           </Section>
 
-          <Section id="rwa-matching" index="05" title="AI RWA matching" intro="ViralTerminal asks which real-world asset the narrative belongs with, then ranks only pair assets that are currently enabled by launch infrastructure.">
+          <Section id="rwa-matching" index="05" title="AI RWA matching" intro="TRND.fun asks which real-world asset the narrative belongs with, then ranks only pair assets that are currently enabled by launch infrastructure.">
             <div className="grid md:grid-cols-[1fr_240px] gap-4 items-stretch">
               <div className="border border-border rounded-lg bg-card/65 p-5">
                 <div className="text-[11px] tracking-[0.15em] text-mutedtext uppercase mb-4">Example · NVIDIA event</div>
@@ -287,7 +287,7 @@ export default function Docs() {
             </div>
           </Section>
 
-          <Section id="trading-fee" index="09" title="Trading fee & distribution" intro="Every token market created through ViralTerminal uses a 1% trading fee. That fee is split across creators, recurring creator incentives, operations and the VIRAL token economy.">
+          <Section id="trading-fee" index="09" title="Trading fee & distribution" intro="Every token market created through TRND.fun uses a 1% trading fee. That fee is split across creators, recurring creator incentives, operations and the TRND token economy.">
             <div className="border border-border rounded-lg bg-card/70 overflow-hidden">
               <div className="h-3 flex">
                 <span className="w-1/2 bg-primary" />
@@ -299,12 +299,12 @@ export default function Docs() {
                 <FeeItem value="50%" label="Creator" detail="Paid to the creator associated with the market." accent />
                 <FeeItem value="20%" label="Daily creator rewards" detail="Funds the daily reward pool for top-performing creators." />
                 <FeeItem value="10%" label="API, team & infrastructure" detail="Supports data providers, AI calls, engineering and operations." />
-                <FeeItem value="20%" label="VIRAL buyback" detail="Used to buy back the VIRAL token according to protocol policy." />
+                <FeeItem value="20%" label="TRND buyback" detail="Used to buy back the TRND token according to protocol policy." />
               </div>
             </div>
             <CodeLine>1% TRADE FEE × 100% = 50% + 20% + 10% + 20%</CodeLine>
             <Notice className="mt-4" icon={CircleDollarSign} title="Example">
-              If a trade generates $1.00 in trading fees, $0.50 goes to the creator, $0.20 to daily creator rewards, $0.10 to API/team/infrastructure and $0.20 to VIRAL buybacks.
+              If a trade generates $1.00 in trading fees, $0.50 goes to the creator, $0.20 to daily creator rewards, $0.10 to API/team/infrastructure and $0.20 to TRND buybacks.
             </Notice>
           </Section>
 
@@ -317,7 +317,7 @@ export default function Docs() {
             </Notice>
           </Section>
 
-          <Section id="viral-buyback" index="11" title="VIRAL buyback" intro="Twenty percent of trading-fee revenue is reserved for VIRAL token buybacks, connecting market activity to the platform token economy.">
+          <Section id="viral-buyback" index="11" title="TRND buyback" intro="Twenty percent of trading-fee revenue is reserved for TRND token buybacks, connecting market activity to the platform token economy.">
             <p className="docs-copy">Production documentation must identify the buyback wallet or contract, execution cadence, eligible venues, slippage controls, transaction records and whether purchased tokens are burned, held or distributed. Until those rules and contracts are finalized, the interface should describe this allocation as a protocol policy—not claim completed onchain execution.</p>
           </Section>
 
@@ -328,9 +328,9 @@ export default function Docs() {
             <p className="docs-copy mt-5">Launched events are never removed from the timeline. Their primary action changes from launch to view market, preserving historical context.</p>
           </Section>
 
-          <Section id="infrastructure" index="13" title="Infrastructure" intro="The consumer experience belongs to ViralTerminal; launch preparation and onchain execution sit beneath it.">
+          <Section id="infrastructure" index="13" title="Infrastructure" intro="The consumer experience belongs to TRND.fun; launch preparation and onchain execution sit beneath it.">
             <div className="border border-border rounded-lg overflow-hidden bg-card/70">
-              {["ViralTerminal interface", "ViralTerminal backend", "Launch infrastructure", "Connected wallet", "Robinhood Chain"].map((item, index) => (
+              {["TRND.fun interface", "TRND.fun backend", "Launch infrastructure", "Connected wallet", "Robinhood Chain"].map((item, index) => (
                 <div key={item} className="flex items-center gap-4 px-4 py-3.5 border-b border-border last:border-0">
                   <span className="font-mono-nums text-xs text-primary">{String(index + 1).padStart(2, "0")}</span>
                   <span className="text-sm text-foreground">{item}</span>

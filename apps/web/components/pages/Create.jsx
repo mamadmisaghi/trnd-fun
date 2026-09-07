@@ -177,7 +177,7 @@ export default function Create() {
           ${ticker} / {selectedPair.symbol}
         </h1>
         <p className="text-secondarytext mt-4 max-w-lg mx-auto leading-relaxed">
-          The token and its paired market are now represented in the ViralTerminal prototype. Production launch status will only finalize after onchain confirmation.
+          The token and its paired market are now represented in the TRND.fun prototype. Production launch status will only finalize after onchain confirmation.
         </p>
         <div className="grid sm:grid-cols-3 border border-border mt-8 text-left">
           <ResultCell label="PAIR" value={selectedPair.symbol} />
@@ -203,7 +203,7 @@ export default function Create() {
           </div>
           <h1 className="text-3xl sm:text-5xl font-semibold tracking-[-0.05em] mt-3">Launch a token</h1>
           <p className="text-sm sm:text-base text-secondarytext mt-3 max-w-2xl leading-relaxed">
-            Create a fixed-supply token and open its paired market through the ViralTerminal protocol on Robinhood Chain.
+            Create a fixed-supply token and open its paired market through the TRND.fun protocol on Robinhood Chain.
           </p>
         </div>
         <div className="flex items-center gap-3 text-xs text-mutedtext">
@@ -334,7 +334,7 @@ export default function Create() {
                   <div className="flex rounded-md border border-border p-1 bg-deep"><span className="px-4 py-2 text-xs rounded-sm bg-foreground text-background">Buy with {selectedPair.symbol}</span></div>
                   <div className="grid grid-cols-4 gap-2 lg:ml-auto">{[1, 2, 5, 10].map((percent) => <button key={percent} onClick={() => setDevBuyPercent(percent)} className={cn("h-9 min-w-14 border text-xs font-mono rounded-sm", devBuyPercent === percent ? "border-primary bg-primary text-primary-foreground" : "border-border text-mutedtext hover:text-foreground")}>{percent}%</button>)}</div>
                 </div>
-                <div className="grid sm:grid-cols-[1fr_260px] gap-3 mt-4"><Field label={`Amount (${selectedPair.symbol})`}><input value={devBuyAmount} onChange={(event) => setDevBuyAmount(event.target.value)} className="terminal-input font-mono" placeholder="0.0" /></Field><div className="border border-border bg-deep px-4 py-3 text-xs text-mutedtext"><div className="text-foreground font-medium">Creator Buy in paired asset</div><div className="mt-1">Your wallet approves {selectedPair.symbol} first when it is an ERC-20 pair.</div></div></div>
+                <div className="grid sm:grid-cols-[1fr_260px] gap-3 mt-4"><Field label="Amount (ETH)"><input value={devBuyAmount} onChange={(event) => setDevBuyAmount(event.target.value)} className="terminal-input font-mono" placeholder="0.0" /></Field><div className="border border-border bg-deep px-4 py-3 text-xs text-mutedtext"><div className="text-foreground font-medium">Creator Buy with ETH</div><div className="mt-1">ETH routes atomically through {selectedPair.symbol} and into the new market.</div></div></div>
               </div>
             </RevealPanel>
           </LaunchSection>
@@ -387,7 +387,7 @@ export default function Create() {
               <Fact icon={LockKeyhole}>The token and its {selectedPair.symbol} market launch together with permanently locked token-side liquidity.</Fact>
               <Fact icon={ShieldCheck}>The factory mints the configured fixed supply once. Profile editing cannot mint, pause transfers, or remove liquidity.</Fact>
               <Fact icon={Database}>Fees, supply, supported pairs, and launch parameters are read from the deployed protocol before preparation.</Fact>
-              <Fact icon={Wallet}>Your connected wallet remains the creator and signer. ViralTerminal never requests or stores private keys.</Fact>
+              <Fact icon={Wallet}>Your connected wallet remains the creator and signer. TRND.fun never requests or stores private keys.</Fact>
             </div>
           </LaunchSection>
 

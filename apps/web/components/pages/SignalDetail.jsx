@@ -118,7 +118,7 @@ export default function SignalDetail() {
                     {timeframes.map((item) => <button key={item} onClick={() => setTimeframe(item)} className={cn("px-2.5 py-1.5 text-[11px] font-mono rounded-sm", timeframe === item ? "bg-primary text-primary-foreground" : "text-mutedtext hover:text-foreground bg-deep")}>{item}</button>)}
                   </div>
                 </div>
-                <LineChart data={series} height={210} color="#A8FF00" />
+                <LineChart data={series} height={210} color="#9CFF2E" />
                 <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-border"><Metric label="Current reach" value={signal.views} /><Metric label="Acceleration" value={`${signal.scoreBreakdown.acceleration}/100`} /><Metric label="Spread" value={`${signal.crossPlatform.length} platforms`} /></div>
               </div>
 

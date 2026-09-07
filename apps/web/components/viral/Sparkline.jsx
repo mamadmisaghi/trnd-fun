@@ -1,7 +1,7 @@
 import React from "react";
 
 // Lightweight inline sparkline — no axes, just the line. Uses simple SVG.
-export default function Sparkline({ data = [], width = 120, height = 36, color = "#A8FF00", fill = true, strokeWidth = 1.5, className = "" }) {
+export default function Sparkline({ data = [], width = 120, height = 36, color = "#9CFF2E", fill = true, strokeWidth = 1.5, className = "" }) {
   if (!data.length) return null;
   const min = Math.min(...data);
   const max = Math.max(...data);

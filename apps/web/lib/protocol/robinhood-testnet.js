@@ -24,6 +24,15 @@ export const protocolContracts = {
   feeEscrow: "0xCA093138A86Ab9aA4f4aB7bE112F6B0a106c8722",
 };
 
+// Populated by the versioned Robinhood-testnet ETH-route deployment. These
+// addresses intentionally belong to the collateralized test adapter; mainnet
+// configuration must use canonical WETH and SwapRouter02 routes instead.
+export const testnetEthRouteContracts = {
+  wrappedEth: process.env.NEXT_PUBLIC_TESTNET_WRAPPED_ETH || "",
+  adapter: process.env.NEXT_PUBLIC_TESTNET_ETH_ADAPTER || "",
+  fee: 500,
+};
+
 export const nativePairAddress = "0x0000000000000000000000000000000000000000";
 
 export const testnetPairAssets = {
@@ -34,6 +43,29 @@ export const testnetPairAssets = {
 
 export function getTestnetPair(symbol) {
   return testnetPairAssets[String(symbol || "").toUpperCase()] || null;
+}
+
+function encodeOneHopPath(tokenIn, tokenOut, fee) {
+  if (!/^0x[0-9a-fA-F]{40}$/.test(tokenIn || "") || !/^0x[0-9a-fA-F]{40}$/.test(tokenOut || "")) {
+    throw new Error("The Robinhood testnet ETH route has not been deployed yet.");
+  }
+  return `0x${tokenIn.slice(2)}${Number(fee).toString(16).padStart(6, "0")}${tokenOut.slice(2)}`;
+}
+
+export function getTestnetEthLeg(pairOrAddress, direction = "buy") {
+  const pair = typeof pairOrAddress === "string" && pairOrAddress.startsWith("0x")
+    ? { address: pairOrAddress, type: pairOrAddress === nativePairAddress ? "NATIVE" : "ERC20" }
+    : pairOrAddress;
+  if (!pair || pair.type === "NATIVE" || pair.address === nativePairAddress) return { v3Path: "0x", v4Hops: [] };
+  const buy = direction === "buy";
+  return {
+    v3Path: encodeOneHopPath(
+      buy ? testnetEthRouteContracts.wrappedEth : pair.address,
+      buy ? pair.address : testnetEthRouteContracts.wrappedEth,
+      testnetEthRouteContracts.fee,
+    ),
+    v4Hops: [],
+  };
 }
 
 export const launchFactoryAbi = [

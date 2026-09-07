@@ -58,7 +58,7 @@ export default function Footer() {
 
         <div className="border-t border-border py-5 flex flex-col md:flex-row md:items-center justify-between gap-3 text-[11px] text-mutedtext">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-            <span>© 2026 ViralTerminal</span>
+            <span>© 2026 TRND.fun</span>
             <span>Built for Robinhood Chain</span>
             <span className="text-primary">Internet → Signal → Market</span>
           </div>
