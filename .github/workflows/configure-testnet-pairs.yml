@@ -34,6 +34,7 @@ jobs:
         run: |
           test -n "$PRIVATE_KEY"
           if [ -z "$RPC_URL" ]; then echo "RPC_URL=https://rpc.testnet.chain.robinhood.com" >> "$GITHUB_ENV"; fi
+          if [[ "$PRIVATE_KEY" != 0x* ]]; then echo "PRIVATE_KEY=0x$PRIVATE_KEY" >> "$GITHUB_ENV"; fi
       - name: Build pair configuration script
         working-directory: contracts
         run: forge build --sizes
