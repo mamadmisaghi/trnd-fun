@@ -1,18 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import Navigation from "@/components/viral/Navigation";
 import Footer from "@/components/viral/Footer";
 import SearchOverlay from "@/components/viral/SearchOverlay";
 import NotificationsPanel from "@/components/viral/NotificationsPanel";
-import { useNavigate } from "@/lib/navigation";
+import { useLocation, useNavigate } from "@/lib/navigation";
 import { portfolio } from "@/data";
 import { MetricChange } from "@/components/viral/ui";
 import { TerminalGrid } from "@/components/aceternity/terminal-grid";
 import { ViralWalletProvider } from "@/lib/protocol/ViralWalletProvider";
 
 export default function AppShell({ children }) {
+  const location = useLocation();
+  const reduceMotion = useReducedMotion();
   const [search, setSearch] = useState(false);
   const [notif, setNotif] = useState(false);
   const [portfolioOpen, setPortfolioOpen] = useState(false);
@@ -31,7 +34,16 @@ export default function AppShell({ children }) {
   return (
     <ViralWalletProvider><div className="min-h-screen bg-background">
       <Navigation onSearch={() => setSearch(true)} onNotifications={() => setNotif(true)} onPortfolio={() => setPortfolioOpen(true)} />
-      <TerminalGrid className="pt-16 min-h-[calc(100vh-4rem)]">{children}</TerminalGrid>
+      <TerminalGrid className="pt-16 min-h-[calc(100vh-4rem)]">
+        <motion.main
+          key={location.pathname}
+          initial={reduceMotion ? false : { opacity: 0, y: 9, filter: "blur(4px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {children}
+        </motion.main>
+      </TerminalGrid>
       <Footer />
       <SearchOverlay open={search} onClose={() => setSearch(false)} />
       <NotificationsPanel open={notif} onClose={() => setNotif(false)} />

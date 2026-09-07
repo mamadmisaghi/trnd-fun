@@ -1,15 +1,35 @@
 "use client";
-import React, { useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "@/lib/navigation";
-import { ArrowDownUp, ArrowLeft, ArrowUpRight, Check, Copy, ExternalLink, Globe2, ShieldCheck, TrendingUp } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { formatEther, formatUnits, isAddress } from "viem";
+import { Link, useNavigate, useParams, useSearchParams } from "@/lib/navigation";
+import { ArrowDownUp, ArrowLeft, ArrowUpRight, Check, Copy, ExternalLink, Globe2, Loader2, RefreshCcw, ShieldCheck, TrendingUp, Wallet } from "lucide-react";
 import Button from "@/components/viral/Button";
 import PairAssetLogo from "@/components/viral/PairAssetLogo";
 import PlatformIcon from "@/components/viral/PlatformIcon";
 import { MetricChange, SectionLabel } from "@/components/viral/ui";
 import { activity, getSignal, getToken, topHolders } from "@/data";
-import { getLaunchByToken } from "@/lib/launchState";
+import { getLaunchByAddress, getLaunchByToken, getLatestLaunch } from "@/lib/launchState";
 import { cn } from "@/lib/utils";
 import SafeImage from "@/components/ui/safe-image";
+import { explorerUrl, robinhoodTestnet } from "@/lib/protocol/robinhood-testnet";
+import { shortAddress, useViralWallet } from "@/lib/protocol/ViralWalletProvider";
+
+const TESTNET_GENESIS = {
+  id: "testnet-genesis",
+  name: "ViralTerminal Testnet Genesis",
+  ticker: "VIRALTEST",
+  image: "/viral-terminal-mark.svg",
+  pairAsset: "ETH",
+  tokenAddress: "0x06353b828dBeB40908f5e08c56a6F7bB60fE92e3",
+  marketCap: "TESTNET",
+  price: "ONCHAIN",
+  change24h: 18.4,
+  volume24h: "LIVE",
+  liquidity: "LOCKED",
+  holders: 2,
+  fromSignal: false,
+  launchTime: "Testnet deployment",
+};
 
 function series(seed) {
   let value = seed;
@@ -22,9 +42,27 @@ function series(seed) {
 export default function TokenMarket() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const stored = getLaunchByToken(id);
+  const [searchParams] = useSearchParams();
+  const requestedAddress = searchParams.get("address");
+  const stored = id === "live" ? (getLaunchByAddress(requestedAddress) || getLatestLaunch()) : getLaunchByToken(id);
   const staticToken = getToken(id);
-  const token = staticToken || (stored ? {
+  const addressOnlyMarket = id === "live" && isAddress(requestedAddress || "") ? {
+    id: "live",
+    name: "ViralTerminal Onchain Market",
+    ticker: "TOKEN",
+    image: "/viral-terminal-mark.svg",
+    pairAsset: "ETH",
+    tokenAddress: requestedAddress,
+    marketCap: "TESTNET",
+    price: "ONCHAIN",
+    change24h: 0,
+    volume24h: "LIVE",
+    liquidity: "LOCKED",
+    holders: 0,
+    fromSignal: false,
+    launchTime: "Onchain",
+  } : null;
+  const token = (id === "testnet-genesis" ? TESTNET_GENESIS : staticToken) || (stored ? {
     id: stored.tokenId,
     name: stored.tokenName,
     ticker: stored.ticker,
@@ -38,25 +76,86 @@ export default function TokenMarket() {
     volume24h: "$12.8K",
     liquidity: "$31.4K",
     holders: 47,
-    fromSignal: true,
+    fromSignal: !stored.manual,
     signalId: stored.eventId,
     launchId: stored.launchId,
     launchTime: "Just now",
-  } : null);
+  } : addressOnlyMarket);
   const signal = token?.fromSignal ? getSignal(token.signalId) : null;
   const [timeframe, setTimeframe] = useState("1H");
   const [side, setSide] = useState("buy");
   const [amount, setAmount] = useState("");
   const [txState, setTxState] = useState("idle");
+  const [txStage, setTxStage] = useState("");
+  const [tradeError, setTradeError] = useState("");
+  const [quoteState, setQuoteState] = useState(null);
+  const [marketState, setMarketState] = useState(null);
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [feeAction, setFeeAction] = useState("");
+  const [lastTx, setLastTx] = useState(null);
+  const wallet = useViralWallet();
+  const liveTokenAddress = isAddress(token?.tokenAddress || "") ? token.tokenAddress : null;
   const chart = useMemo(() => series(Math.max(1, token?.change24h || 14)), [token?.change24h, timeframe]);
+
+  const refreshMarket = useCallback(async () => {
+    if (!liveTokenAddress) { setMarketState(null); return; }
+    setMarketLoading(true);
+    try {
+      setMarketState(await wallet.readMarket(liveTokenAddress, wallet.address));
+      setTradeError("");
+    } catch (error) {
+      setMarketState(null);
+      setTradeError(error?.shortMessage || error?.message || "Unable to read this market.");
+    } finally { setMarketLoading(false); }
+  }, [liveTokenAddress, wallet.address, wallet.readMarket]);
+
+  useEffect(() => { refreshMarket(); }, [refreshMarket]);
+
+  useEffect(() => {
+    setQuoteState(null);
+    if (!marketState || !wallet.isConnected || !amount || Number(amount) <= 0) return undefined;
+    const timer = window.setTimeout(async () => {
+      try {
+        const next = await wallet.quoteEthTrade({ tokenAddress: liveTokenAddress, side, amount });
+        setQuoteState(next);
+        setTradeError("");
+      } catch (error) { setTradeError(error?.shortMessage || error?.message || "Unable to quote this trade."); }
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [amount, liveTokenAddress, marketState, side, wallet.isConnected, wallet.quoteEthTrade]);
 
   if (!token) return <div className="max-w-3xl mx-auto px-4 py-32 text-center"><p className="text-secondarytext">Market not found.</p><Button as={Link} to="/explore" variant="outline" className="mt-4">Back to Markets</Button></div>;
 
   const quote = token.pairAsset || "ETH";
-  const submitTrade = () => {
+  const submitTrade = async () => {
+    setTradeError("");
+    if (!wallet.isConnected) { try { await wallet.connect(); } catch (error) { setTradeError(error.message); } return; }
+    if (!wallet.isCorrectNetwork) { try { await wallet.switchNetwork(); } catch (error) { setTradeError(error.message); } return; }
+    if (!marketState) { setTradeError("This is a preview market. Open a token launched by the active testnet factory to trade."); return; }
     setTxState("pending");
-    window.setTimeout(() => setTxState("success"), 1300);
+    try {
+      const result = await wallet.tradeEthMarket({ tokenAddress: liveTokenAddress, side, amount, slippageBps: 100, onStage: setTxStage });
+      setLastTx(result.hash);
+      setTxState("success");
+      setAmount("");
+      setQuoteState(null);
+      await refreshMarket();
+    } catch (error) { setTxState("idle"); setTradeError(error?.shortMessage || error?.message || "The trade failed."); }
   };
+
+  const runFeeAction = async (action) => {
+    setFeeAction(action);
+    setTradeError("");
+    try {
+      const result = action === "collect" ? await wallet.collectMarketFees(liveTokenAddress) : await wallet.claimMarketFees({ tokenAddress: liveTokenAddress, currency: action });
+      setLastTx(result.hash);
+      await refreshMarket();
+    } catch (error) { setTradeError(error?.shortMessage || error?.message || "The fee transaction failed."); }
+    finally { setFeeAction(""); }
+  };
+
+  const payBalance = side === "buy" ? (wallet.balance ? Number(formatEther(wallet.balance)) : 0) : Number(marketState?.tokenBalanceLabel || 0);
+  const receiveLabel = quoteState?.formatted ? formatDisplay(quoteState.formatted) : "0";
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 sm:px-6 py-5 sm:py-8">
@@ -97,23 +196,31 @@ export default function TokenMarket() {
 
         <aside className="space-y-5 self-start">
           <section className="border border-border-strong bg-card rounded-lg overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-border flex items-center justify-between text-[10px]">
+              <span className={cn("tracking-[0.12em]", marketState ? "text-primary" : "text-mutedtext")}>{marketLoading ? "READING CHAIN…" : marketState ? "LIVE · ROBINHOOD TESTNET" : "PREVIEW MARKET"}</span>
+              {wallet.isConnected && <span className="font-mono text-mutedtext">{shortAddress(wallet.address)}</span>}
+            </div>
             <div className="px-4 pt-4"><div className="grid grid-cols-2 rounded-md bg-deep p-1"><button onClick={() => { setSide("buy"); setTxState("idle"); }} className={cn("py-2.5 rounded-sm text-sm font-semibold transition-colors", side === "buy" ? "bg-primary text-primary-foreground" : "text-mutedtext hover:text-foreground")}>Buy</button><button onClick={() => { setSide("sell"); setTxState("idle"); }} className={cn("py-2.5 rounded-sm text-sm font-semibold transition-colors", side === "sell" ? "bg-foreground text-background" : "text-mutedtext hover:text-foreground")}>Sell</button></div></div>
             <div className="p-4">
               <div className="rounded-md border border-border bg-deep/70 p-3 focus-within:border-primary/60 transition-colors">
-                <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.12em] text-mutedtext"><span>You pay</span><span>Balance 2.40</span></div>
-                <div className="mt-3 flex items-center gap-3"><input value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" className="min-w-0 flex-1 bg-transparent outline-none font-mono-nums text-2xl placeholder:text-mutedtext" /><div className="flex items-center gap-2 border border-border bg-card px-2.5 py-2 rounded-md shrink-0">{side === "buy" ? <PairAssetLogo symbol={quote} size={22} className="rounded-full" /> : <SafeImage src={token.image} alt="" className="w-[22px] h-[22px] rounded-full" />}<span className="font-mono text-xs font-semibold">{side === "buy" ? quote : token.ticker}</span></div></div>
+                <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.12em] text-mutedtext"><span>You pay</span><span>Balance {formatDisplay(payBalance)}</span></div>
+                <div className="mt-3 flex items-center gap-3"><input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" className="min-w-0 flex-1 bg-transparent outline-none font-mono-nums text-2xl placeholder:text-mutedtext" /><div className="flex items-center gap-2 border border-border bg-card px-2.5 py-2 rounded-md shrink-0">{side === "buy" ? <PairAssetLogo symbol="ETH" size={22} className="rounded-full" /> : <SafeImage src={token.image} alt="" className="w-[22px] h-[22px] rounded-full" />}<span className="font-mono text-xs font-semibold">{side === "buy" ? "ETH" : token.ticker}</span></div></div>
               </div>
-              <div className="grid grid-cols-4 gap-1.5 mt-2">{[25, 50, 75, 100].map((percent) => <button key={percent} onClick={() => setAmount((2.4 * percent / 100).toFixed(2))} className="border border-border rounded-sm py-1.5 text-[10px] text-mutedtext hover:text-primary hover:border-primary/35 transition-colors">{percent === 100 ? "MAX" : `${percent}%`}</button>)}</div>
+              <div className="grid grid-cols-4 gap-1.5 mt-2">{[25, 50, 75, 100].map((percent) => <button key={percent} onClick={() => setAmount(((side === "buy" && percent === 100 ? payBalance * 0.94 : payBalance) * percent / 100).toFixed(side === "buy" ? 6 : 3))} className="border border-border rounded-sm py-1.5 text-[10px] text-mutedtext hover:text-primary hover:border-primary/35 transition-colors">{percent === 100 ? "MAX" : `${percent}%`}</button>)}</div>
               <div className="relative h-6"><span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full border border-border-strong bg-card flex items-center justify-center text-mutedtext"><ArrowDownUp size={13} /></span></div>
               <div className="rounded-md border border-border bg-deep/45 p-3">
                 <div className="text-[10px] uppercase tracking-[0.12em] text-mutedtext">You receive</div>
-                <div className="mt-3 flex items-center gap-3"><span className="min-w-0 flex-1 font-mono-nums text-2xl">{amount ? Math.round(Number(amount) * 18400).toLocaleString() : "0"}</span><div className="flex items-center gap-2 border border-border bg-card px-2.5 py-2 rounded-md shrink-0">{side === "buy" ? <SafeImage src={token.image} alt="" className="w-[22px] h-[22px] rounded-full" /> : <PairAssetLogo symbol={quote} size={22} className="rounded-full" />}<span className="font-mono text-xs font-semibold">{side === "buy" ? token.ticker : quote}</span></div></div>
+                <div className="mt-3 flex items-center gap-3"><span className="min-w-0 flex-1 font-mono-nums text-2xl">{quoteState?.approvalRequired ? "After approval" : receiveLabel}</span><div className="flex items-center gap-2 border border-border bg-card px-2.5 py-2 rounded-md shrink-0">{side === "buy" ? <SafeImage src={token.image} alt="" className="w-[22px] h-[22px] rounded-full" /> : <PairAssetLogo symbol="ETH" size={22} className="rounded-full" />}<span className="font-mono text-xs font-semibold">{side === "buy" ? token.ticker : "ETH"}</span></div></div>
               </div>
-              <div className="my-4 space-y-2 text-[11px]"><ConfigRow label="Rate" value={`1 ${quote} ≈ 18,400 ${token.ticker}`} /><ConfigRow label="Trading fee" value="1.00%" /><ConfigRow label="Minimum received" value={`${amount ? Math.round(Number(amount) * 18216).toLocaleString() : "0"} ${side === "buy" ? token.ticker : quote}`} /></div>
-              <Button className="w-full" size="lg" onClick={submitTrade} disabled={!amount || txState === "pending"}>{txState === "pending" ? "Preparing quote…" : txState === "success" ? <><Check size={15} /> Quote ready</> : `${side === "buy" ? "Buy" : "Sell"} $${token.ticker}`}</Button>
-              <p className="text-[10px] text-mutedtext text-center mt-2.5">Prototype quote · wallet signature required in production</p>
+              <div className="my-4 space-y-2 text-[11px]"><ConfigRow label="Network" value={`Robinhood Testnet · ${robinhoodTestnet.id}`} /><ConfigRow label="Protocol trading fee" value="1.00%" /><ConfigRow label="Slippage protection" value="1.00%" />{quoteState?.approvalRequired && <ConfigRow label="Token allowance" value="Approval required" />}</div>
+              {tradeError && <div className="mb-3 border border-destructive/35 bg-destructive/[0.05] p-2.5 text-[11px] text-destructive leading-relaxed">{tradeError}</div>}
+              <Button className="w-full" size="lg" onClick={submitTrade} disabled={!amount || txState === "pending" || (wallet.isConnected && !marketState)}>{txState === "pending" ? <><Loader2 size={15} className="animate-spin" />{stageLabel(txStage)}</> : txState === "success" ? <><Check size={15} /> Trade confirmed</> : !wallet.isConnected ? <><Wallet size={15} /> Connect to trade</> : `${side === "buy" ? "Buy" : "Sell"} $${token.ticker}`}</Button>
+              {lastTx && <a href={explorerUrl("tx", lastTx)} target="_blank" rel="noreferrer" className="mt-3 flex items-center justify-center gap-1 text-[10px] text-primary hover:underline">View confirmed transaction <ExternalLink size={10} /></a>}
+              <p className="text-[10px] text-mutedtext text-center mt-2.5">Quotes are simulated against the deployed router; your wallet signs every transaction.</p>
             </div>
           </section>
+
+          <FeeActions token={token} market={marketState} wallet={wallet} busy={feeAction} onAction={runFeeAction} onRefresh={refreshMarket} />
 
           <section className="border border-border bg-card rounded-sm p-4">
             <div className="flex items-center gap-2"><ShieldCheck size={14} className="text-primary" /><SectionLabel>Market configuration</SectionLabel></div>
@@ -129,10 +236,55 @@ export default function TokenMarket() {
 }
 
 function HeaderStat({ label, value }) { return <div><span className="text-[9px] uppercase tracking-[0.13em] text-mutedtext block">{label}</span><span className="font-mono-nums text-base xl:text-lg font-semibold leading-tight mt-1.5 block">{value}</span></div>; }
+function FeeActions({ token, market, wallet, busy, onAction, onRefresh }) {
+  const pendingEth = market ? formatDisplay(formatEther(market.pendingNative)) : "0";
+  const pendingToken = market ? formatDisplay(formatUnits(market.pendingToken, market.decimals)) : "0";
+  const claimableEth = market ? formatDisplay(formatEther(market.nativeClaimable)) : "0";
+  const claimableToken = market ? formatDisplay(formatUnits(market.tokenClaimable, market.decimals)) : "0";
+  const hasPending = Boolean(market && (market.pendingNative > 0n || market.pendingToken > 0n));
+  return (
+    <section className="border border-border bg-card rounded-sm overflow-hidden">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+        <div><SectionLabel>Creator fees</SectionLabel><p className="text-[10px] text-mutedtext mt-1">Collect pool fees into escrow, then claim from the connected creator wallet.</p></div>
+        <button onClick={onRefresh} disabled={!market || Boolean(busy)} className="w-8 h-8 border border-border flex items-center justify-center text-mutedtext hover:text-primary disabled:opacity-40"><RefreshCcw size={13} className={market === null ? "animate-spin" : ""} /></button>
+      </div>
+      <div className="p-4">
+        {!market ? <p className="text-xs text-mutedtext">Fee actions appear for markets launched by the active testnet factory.</p> : <>
+          <div className="grid grid-cols-2 gap-2">
+            <FeeCell label="Pool pending" value={`${pendingEth} ETH`} />
+            <FeeCell label="Pool pending" value={`${pendingToken} ${token.ticker}`} />
+            <FeeCell label="Wallet claimable" value={`${claimableEth} ETH`} accent={market.nativeClaimable > 0n} />
+            <FeeCell label="Wallet claimable" value={`${claimableToken} ${token.ticker}`} accent={market.tokenClaimable > 0n} />
+          </div>
+          <div className="mt-3 text-[10px] text-mutedtext">Recipient <span className="font-mono text-secondarytext">{shortAddress(market.launched.creatorFeeRecipient)}</span>{market.isCreator && <span className="text-primary ml-2">CONNECTED CREATOR</span>}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">
+            <Button variant="outline" onClick={() => onAction("collect")} disabled={!hasPending || Boolean(busy)}>{busy === "collect" ? <Loader2 size={13} className="animate-spin" /> : null}Collect</Button>
+            <Button variant="outline" onClick={() => onAction("native")} disabled={!wallet.isConnected || market.nativeClaimable === 0n || Boolean(busy)}>{busy === "native" ? <Loader2 size={13} className="animate-spin" /> : null}Claim ETH</Button>
+            <Button variant="outline" onClick={() => onAction("token")} disabled={!wallet.isConnected || market.tokenClaimable === 0n || Boolean(busy)}>{busy === "token" ? <Loader2 size={13} className="animate-spin" /> : null}Claim {token.ticker}</Button>
+          </div>
+        </>}
+      </div>
+    </section>
+  );
+}
+function FeeCell({ label, value, accent = false }) { return <div className="border border-border bg-deep/55 p-2.5"><span className="text-[9px] uppercase tracking-[0.11em] text-mutedtext block">{label}</span><span className={cn("font-mono-nums text-xs mt-1.5 block truncate", accent && "text-primary")}>{value}</span></div>; }
 function OriginCell({ label, value, accent = false }) { return <div className="bg-deep px-3 py-3"><span className="text-[9px] uppercase tracking-[0.12em] text-mutedtext block">{label}</span><span className={cn("font-mono text-sm mt-1 block", accent && "text-primary")}>{value}</span></div>; }
 function Field({ label, children }) { return <label><span className="text-[10px] uppercase tracking-[0.13em] text-mutedtext block mb-1.5">{label}</span>{children}</label>; }
 function ConfigRow({ label, value }) { return <div className="flex items-center justify-between text-xs"><span className="text-mutedtext">{label}</span><span>{value}</span></div>; }
 function AboutLink({ icon: Icon, label }) { return <button className="inline-flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-[11px] text-secondarytext hover:text-primary hover:border-primary/35">{Icon && <Icon size={12} />}{label}</button>; }
+
+function stageLabel(stage) {
+  return ({ approval: "Approve token", quoting: "Refreshing quote", signature: "Confirm in wallet", confirming: "Confirming onchain" })[stage] || "Preparing trade";
+}
+
+function formatDisplay(value) {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number)) return "0";
+  if (number === 0) return "0";
+  if (Math.abs(number) >= 1_000_000) return number.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  if (Math.abs(number) >= 1) return number.toLocaleString("en-US", { maximumFractionDigits: 4 });
+  return number.toLocaleString("en-US", { maximumSignificantDigits: 6 });
+}
 
 function CandleChart({ data, positive }) {
   const width = 900;

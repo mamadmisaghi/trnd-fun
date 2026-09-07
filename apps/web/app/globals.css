@@ -209,6 +209,12 @@
 }
 .animate-flare-fade { animation: flare-fade 0.4s ease-out both; }
 
+@keyframes metric-reveal {
+  from { opacity: 0; transform: translateY(8px); border-color: rgba(168,255,0,0.22); }
+  to { opacity: 1; transform: translateY(0); border-color: #202020; }
+}
+.animate-metric-reveal { animation: metric-reveal 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
 @keyframes flare-ticker {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
@@ -222,3 +228,9 @@
   100% { transform: translateY(2000%); opacity: 0; }
 }
 .animate-flare-scan { animation: flare-scan 6s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-flare-enter,
+  .animate-flare-fade,
+  .animate-metric-reveal { animation: none !important; }
+}

@@ -212,7 +212,7 @@ export default function LaunchStudio() {
           <SummaryCell label="Viral score" value={signal.viralScore.toFixed(1)} />
           <SummaryCell label="AI match" value={`${launch.pairMatchScore || signal.pairRecommendations[0].score}%`} />
         </div>
-        <Button as={Link} to={`/token/${launch.tokenId}`} size="lg" className="mt-6">View live market <ArrowRight size={15} /></Button>
+        <Button as={Link} to={launch.tokenAddress ? `/token/live?address=${launch.tokenAddress}` : `/token/${launch.tokenId}`} size="lg" className="mt-6">View live market <ArrowRight size={15} /></Button>
       </div>
     );
   }
@@ -235,7 +235,7 @@ export default function LaunchStudio() {
         </div>
         {(onchainResult?.tokenAddress || runtimeLaunch?.tokenAddress) && <a href={explorerUrl("address", onchainResult?.tokenAddress || runtimeLaunch.tokenAddress)} target="_blank" rel="noreferrer" className="block mt-5 font-mono text-xs text-primary hover:underline">View token contract</a>}
         {(onchainResult?.hash || runtimeLaunch?.txHash) && <a href={explorerUrl("tx", onchainResult?.hash || runtimeLaunch.txHash)} target="_blank" rel="noreferrer" className="block mt-2 font-mono text-xs text-secondarytext hover:text-primary">View confirmed transaction</a>}
-        <div className="flex flex-wrap items-center justify-center gap-3 mt-7"><Button as="a" href={explorerUrl("address", runtimeLaunch.tokenAddress)} target="_blank" rel="noreferrer" size="lg">View contract <ArrowRight size={15} /></Button><Button as={Link} to="/live" variant="outline" size="lg">Return to Live</Button></div>
+        <div className="flex flex-wrap items-center justify-center gap-3 mt-7"><Button as={Link} to={`/token/live?address=${runtimeLaunch.tokenAddress}`} size="lg">Trade live market <ArrowRight size={15} /></Button><Button as="a" href={explorerUrl("address", runtimeLaunch.tokenAddress)} target="_blank" rel="noreferrer" variant="outline" size="lg">View contract</Button><Button as={Link} to="/live" variant="outline" size="lg">Return to Live</Button></div>
       </div>
     );
   }

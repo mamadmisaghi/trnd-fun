@@ -45,6 +45,7 @@ import { creatorProgram, getCreator, pairAssets, pairCatalog } from "@/data";
 import { cn } from "@/lib/utils";
 import { explorerUrl } from "@/lib/protocol/robinhood-testnet";
 import { shortAddress, useViralWallet } from "@/lib/protocol/ViralWalletProvider";
+import { confirmManualLaunch } from "@/lib/launchState";
 
 const factorySnapshot = {
   creationFee: "0.001 ETH",
@@ -147,6 +148,18 @@ export default function Create() {
         creatorFeePercent: creatorFeeEnabled ? creatorBuyFee : 0,
         openingBuyEth: devBuyEnabled ? devBuyAmount || "0" : "0",
       });
+      confirmManualLaunch({
+        tokenId: (ticker || "token").toLowerCase().replace(/[^a-z0-9]/g, ""),
+        tokenName: name,
+        ticker,
+        description,
+        image,
+        selectedPair: selectedPair.symbol,
+        creatorWallet: wallet.address,
+        tokenAddress: result.tokenAddress,
+        txHash: result.hash,
+        poolId: result.poolId,
+      });
       setLaunchResult(result);
       setPhase("success");
     } catch (error) {
@@ -176,7 +189,7 @@ export default function Create() {
         {launchResult?.tokenAddress && <a href={explorerUrl("address", launchResult.tokenAddress)} target="_blank" rel="noreferrer" className="block mt-5 font-mono text-xs text-primary hover:underline">Token {launchResult.tokenAddress}</a>}
         {launchResult?.hash && <a href={explorerUrl("tx", launchResult.hash)} target="_blank" rel="noreferrer" className="block mt-2 font-mono text-xs text-secondarytext hover:text-primary">View confirmed transaction</a>}
         <div className="flex flex-col sm:flex-row gap-3 justify-center mt-7">
-          <Button as={Link} to="/explore" size="lg">View markets <ArrowRight size={15} /></Button>
+          <Button as={Link} to={`/token/live?address=${launchResult?.tokenAddress || ""}`} size="lg">Trade live market <ArrowRight size={15} /></Button>
           <Button as={Link} to="/live" variant="outline" size="lg">Return to Live</Button>
         </div>
       </div>

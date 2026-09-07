@@ -37,6 +37,25 @@ export function getLaunchByToken(tokenId) {
   return Object.values(readAll()).find((record) => record.tokenId === tokenId) || null;
 }
 
+export function getLaunchByAddress(tokenAddress) {
+  if (!tokenAddress) return null;
+  return Object.values(readAll()).find((record) => record.tokenAddress?.toLowerCase() === tokenAddress.toLowerCase()) || null;
+}
+
+export function getLatestLaunch() {
+  return Object.values(readAll())
+    .filter((record) => record.status === "LAUNCHED" && record.tokenAddress)
+    .sort((a, b) => new Date(b.confirmedAt || b.createdAt || 0) - new Date(a.confirmedAt || a.createdAt || 0))[0] || null;
+}
+
+export function confirmManualLaunch(payload) {
+  const all = readAll();
+  const key = `manual:${payload.tokenAddress || Date.now()}`;
+  const record = { ...payload, status: "LAUNCHED", manual: true, confirmedAt: new Date().toISOString() };
+  writeAll({ ...all, [key]: record });
+  return record;
+}
+
 export function reserveEvent(eventId, wallet = "0x7a3f…c821", durationMs = 90000) {
   const all = readAll();
   const key = String(eventId);
