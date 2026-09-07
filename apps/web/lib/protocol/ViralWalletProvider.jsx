@@ -292,10 +292,12 @@ export function ViralWalletProvider({ children }) {
     });
     if (!launched.exists) throw new Error("This token was not launched by the active ViralTerminal testnet factory.");
     const pairIsNative = launched.pairToken.toLowerCase() === nativePairAddress;
-    const [poolKey, pendingFees, decimals, pairDecimals, pairSymbol] = await Promise.all([
+    const [poolKey, pendingFees, decimals, tokenName, tokenSymbol, pairDecimals, pairSymbol] = await Promise.all([
       publicClient.readContract({ address: protocolContracts.launchFactory, abi: launchFactoryAbi, functionName: "poolKeyFor", args: [tokenAddress] }),
       publicClient.readContract({ address: protocolContracts.launchLocker, abi: launchLockerAbi, functionName: "pendingFees", args: [tokenAddress] }),
       publicClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: "decimals" }),
+      publicClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: "name" }),
+      publicClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: "symbol" }),
       pairIsNative ? 18 : publicClient.readContract({ address: launched.pairToken, abi: erc20Abi, functionName: "decimals" }),
       pairIsNative ? "ETH" : publicClient.readContract({ address: launched.pairToken, abi: erc20Abi, functionName: "symbol" }),
     ]);
@@ -320,6 +322,8 @@ export function ViralWalletProvider({ children }) {
       launched,
       poolKey,
       decimals: Number(decimals),
+      tokenName,
+      tokenSymbol,
       tokenBalance,
       tokenBalanceLabel: formatUnits(tokenBalance, Number(decimals)),
       pairAddress: launched.pairToken,

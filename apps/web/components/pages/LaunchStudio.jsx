@@ -28,6 +28,7 @@ import { Switch } from "@/components/ui/switch";
 import SafeImage from "@/components/ui/safe-image";
 import { explorerUrl, getTestnetPair } from "@/lib/protocol/robinhood-testnet";
 import { useViralWallet } from "@/lib/protocol/ViralWalletProvider";
+import { indexTransaction } from "@/lib/indexer/client";
 
 const steps = ["Select Pair", "Configure Token", "Review", "Wallet"];
 
@@ -179,6 +180,7 @@ export default function LaunchStudio() {
         txHash: result.hash,
         poolId: result.poolId,
       });
+      indexTransaction(result.hash).catch(() => {});
       setOnchainResult(result);
       setRuntimeLaunch(record);
       setPhase("success");

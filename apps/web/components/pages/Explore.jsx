@@ -1,9 +1,10 @@
 "use client";
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import TokenRow from "@/components/viral/TokenRow";
 import { FilterChip, SectionLabel } from "@/components/viral/ui";
 import { tokens } from "@/data";
+import { getIndexedMarkets, indexedMarketToToken } from "@/lib/indexer/client";
 
 const tabs = [
   { key: "trending", label: "Trending" },
@@ -20,9 +21,23 @@ export default function Explore() {
   const [range, setRange] = useState("24H");
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [indexedTokens, setIndexedTokens] = useState([]);
+  const [indexerState, setIndexerState] = useState("loading");
+
+  useEffect(() => {
+    let active = true;
+    getIndexedMarkets(50)
+      .then((markets) => {
+        if (!active) return;
+        setIndexedTokens(markets.map(indexedMarketToToken));
+        setIndexerState("live");
+      })
+      .catch(() => active && setIndexerState("fallback"));
+    return () => { active = false; };
+  }, []);
 
   const list = useMemo(() => {
-    let l = [...tokens];
+    let l = [...indexedTokens, ...tokens];
     if (query) l = l.filter((t) => t.name.toLowerCase().includes(query.toLowerCase()) || t.ticker.toLowerCase().includes(query.toLowerCase()));
     if (tab === "trending") l.sort((a, b) => b.change24h - a.change24h);
     if (tab === "new") l.sort((a, b) => a.age.localeCompare(b.age));
@@ -31,7 +46,7 @@ export default function Explore() {
     if (tab === "signals") l = l.filter((t) => t.fromSignal);
     if (tab === "pairs") l = l.filter((t) => t.pairAsset && t.pairAsset !== "ETH");
     return l;
-  }, [tab, query]);
+  }, [indexedTokens, tab, query]);
 
   const totalMarkets = query ? list.length : 247;
   const pageCount = Math.max(1, Math.ceil(totalMarkets / rowsPerPage));
@@ -53,7 +68,7 @@ export default function Explore() {
     <div className="max-w-[1640px] mx-auto px-4 sm:px-6 py-6 sm:py-10">
       <div className="flex flex-col gap-4 mb-6">
         <div>
-          <div className="text-[10px] tracking-[0.15em] text-primary mb-2">LIVE ON ROBINHOOD CHAIN</div>
+          <div className="text-[10px] tracking-[0.15em] text-primary mb-2">LIVE ON ROBINHOOD CHAIN · {indexerState === "live" ? `${indexedTokens.length} ONCHAIN MARKET${indexedTokens.length === 1 ? "" : "S"}` : indexerState === "loading" ? "SYNCING TESTNET" : "MOCK FALLBACK"}</div>
           <h1 className="font-heading font-semibold text-3xl sm:text-4xl text-foreground tracking-[-0.045em]">Markets</h1>
           <p className="text-sm text-secondarytext mt-2">Markets created from internet events, permanently connected to their source and paired asset.</p>
         </div>

@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import SafeImage from "@/components/ui/safe-image";
 import { explorerUrl, robinhoodTestnet } from "@/lib/protocol/robinhood-testnet";
 import { shortAddress, useViralWallet } from "@/lib/protocol/ViralWalletProvider";
+import { getIndexedMarket, getIndexedTrades, indexTransaction } from "@/lib/indexer/client";
 
 const TESTNET_GENESIS = {
   id: "testnet-genesis",
@@ -93,9 +94,23 @@ export default function TokenMarket() {
   const [marketLoading, setMarketLoading] = useState(false);
   const [feeAction, setFeeAction] = useState("");
   const [lastTx, setLastTx] = useState(null);
+  const [indexedMarket, setIndexedMarket] = useState(null);
+  const [indexedTrades, setIndexedTrades] = useState([]);
   const wallet = useViralWallet();
   const liveTokenAddress = isAddress(token?.tokenAddress || "") ? token.tokenAddress : null;
-  const chart = useMemo(() => series(Math.max(1, token?.change24h || 14)), [token?.change24h, timeframe]);
+  const chart = useMemo(() => {
+    const prices = indexedTrades.slice().reverse().map((trade) => tradePrice(trade, indexedMarket)).filter((value) => Number.isFinite(value) && value > 0);
+    return prices.length > 1 ? prices : series(Math.max(1, token?.change24h || 14));
+  }, [indexedMarket, indexedTrades, token?.change24h, timeframe]);
+
+  useEffect(() => {
+    if (!liveTokenAddress) { setIndexedMarket(null); setIndexedTrades([]); return; }
+    let active = true;
+    Promise.all([getIndexedMarket(liveTokenAddress), getIndexedTrades(liveTokenAddress)])
+      .then(([market, trades]) => { if (active) { setIndexedMarket(market); setIndexedTrades(trades); } })
+      .catch(() => { if (active) { setIndexedMarket(null); setIndexedTrades([]); } });
+    return () => { active = false; };
+  }, [liveTokenAddress, lastTx]);
 
   const refreshMarket = useCallback(async () => {
     if (!liveTokenAddress) { setMarketState(null); return; }
@@ -127,6 +142,8 @@ export default function TokenMarket() {
   if (!token) return <div className="max-w-3xl mx-auto px-4 py-32 text-center"><p className="text-secondarytext">Market not found.</p><Button as={Link} to="/explore" variant="outline" className="mt-4">Back to Markets</Button></div>;
 
   const quote = marketState?.pairSymbol || token.pairAsset || "ETH";
+  const displayName = marketState?.tokenName || indexedMarket?.token_name || token.name;
+  const displayTicker = marketState?.tokenSymbol || indexedMarket?.token_symbol || token.ticker;
   const submitTrade = async () => {
     setTradeError("");
     if (!wallet.isConnected) { try { await wallet.connect(); } catch (error) { setTradeError(error.message); } return; }
@@ -136,6 +153,7 @@ export default function TokenMarket() {
     try {
       const result = await wallet.tradeEthMarket({ tokenAddress: liveTokenAddress, side, amount, slippageBps: 100, onStage: setTxStage });
       setLastTx(result.hash);
+      await indexTransaction(result.hash).catch(() => null);
       setTxState("success");
       setAmount("");
       setQuoteState(null);
@@ -165,7 +183,7 @@ export default function TokenMarket() {
 
       <header className="border border-border bg-card rounded-sm mb-5">
         <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-          <div className="flex items-center gap-4 min-w-0"><SafeImage src={token.image} alt="" className="w-16 h-16 border border-border shrink-0" /><div className="min-w-0"><div className="flex items-center gap-2 flex-wrap"><h1 className="text-2xl font-semibold tracking-[-0.035em] truncate">{token.name}</h1><span className={`text-[9px] border px-2 py-0.5 tracking-[0.13em] ${token.fromSignal ? "text-primary border-primary/25 bg-primary/[0.04]" : "text-secondarytext border-border-strong"}`}>{token.fromSignal ? "VIRAL ORIGIN" : "MANUAL LAUNCH"}</span></div><div className="mt-1 flex items-center gap-1.5 font-mono text-sm text-primary"><span>${token.ticker} /</span><PairAssetLogo symbol={quote} size={20} className="rounded-full" /><span>{quote}</span></div><button className="text-[11px] text-mutedtext mt-1 flex items-center gap-1 hover:text-foreground">{token.tokenAddress}<Copy size={11} /></button><div className="mt-2 flex items-center gap-4 text-[10px] text-mutedtext"><span>Creator <b className="text-secondarytext">@viralindex</b></span><span>Created {token.launchTime}</span></div></div></div>
+          <div className="flex items-center gap-4 min-w-0"><SafeImage src={token.image} alt="" className="w-16 h-16 border border-border shrink-0" /><div className="min-w-0"><div className="flex items-center gap-2 flex-wrap"><h1 className="text-2xl font-semibold tracking-[-0.035em] truncate">{displayName}</h1><span className={`text-[9px] border px-2 py-0.5 tracking-[0.13em] ${token.fromSignal ? "text-primary border-primary/25 bg-primary/[0.04]" : "text-secondarytext border-border-strong"}`}>{token.fromSignal ? "VIRAL ORIGIN" : "MANUAL LAUNCH"}</span></div><div className="mt-1 flex items-center gap-1.5 font-mono text-sm text-primary"><span>${displayTicker} /</span><PairAssetLogo symbol={quote} size={20} className="rounded-full" /><span>{quote}</span></div><button className="text-[11px] text-mutedtext mt-1 flex items-center gap-1 hover:text-foreground">{token.tokenAddress}<Copy size={11} /></button><div className="mt-2 flex items-center gap-4 text-[10px] text-mutedtext"><span>Creator <b className="text-secondarytext">{indexedMarket?.deployer ? shortAddress(indexedMarket.deployer) : "@viralindex"}</b></span><span>Created {token.launchTime}</span></div></div></div>
           <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-x-5 gap-y-4 xl:min-w-[760px]"><HeaderStat label="Price" value={token.price} /><HeaderStat label="24H" value={<MetricChange value={token.change24h} />} /><HeaderStat label="Market Cap" value={token.marketCap} /><HeaderStat label="FDV" value={token.marketCap} /><HeaderStat label="Liquidity" value={token.liquidity} /><HeaderStat label="24H Volume" value={token.volume24h} /><HeaderStat label="Holders" value={token.holders.toLocaleString()} /></div>
         </div>
         <div className="px-4 sm:px-5 py-3 border-t border-border grid md:grid-cols-[1fr_360px] gap-4 text-xs"><div className="flex flex-wrap items-center gap-x-8 gap-y-2 text-mutedtext"><span>Creator fee generated <b className="font-mono-nums text-base text-foreground ml-1">$14,270</b></span><span>Created <b className="text-foreground ml-1">Jun 14, 2025 · 2:21 PM</b></span></div><p className="text-secondarytext leading-relaxed">A cultural market connected to a real internet moment and priced against {quote}.</p></div>
@@ -180,7 +198,7 @@ export default function TokenMarket() {
           </section>
 
           <section className="grid lg:grid-cols-[minmax(0,1.8fr)_minmax(260px,1fr)] gap-5">
-            <div className="border border-border bg-card rounded-sm overflow-hidden"><div className="px-4 py-3 border-b border-border"><h2 className="text-sm font-semibold">Recent trades</h2></div><div className="grid grid-cols-[60px_54px_minmax(105px,1fr)_72px_86px_90px] gap-2 px-4 py-2 border-b border-border bg-deep/45 text-[9px] uppercase tracking-[0.1em] text-mutedtext"><span>Time</span><span>Type</span><span>Wallet</span><span>{quote}</span><span>${token.ticker}</span><span>Price</span></div>{activity.slice(0, 8).map((trade, index) => <div key={`${trade.wallet}-${index}`} className="grid grid-cols-[60px_54px_minmax(105px,1fr)_72px_86px_90px] gap-2 px-4 py-2 border-b border-border last:border-0 text-[11px] font-mono"><span className="text-mutedtext">{trade.time} ago</span><span className={trade.type === "sell" ? "text-destructive" : "text-primary"}>{trade.type.toUpperCase()}</span><span className="truncate text-secondarytext">{trade.wallet}</span><span>{(0.38 + index * 0.27).toFixed(2)}</span><span>{(6482 + index * 9043).toLocaleString()}</span><span>{token.price}</span></div>)}</div>
+            <RecentTrades trades={indexedTrades} indexedMarket={indexedMarket} fallback={activity} quote={quote} ticker={displayTicker} fallbackPrice={token.price} />
             <div className="border border-border bg-card rounded-sm overflow-hidden"><div className="px-4 py-3 border-b border-border"><h2 className="text-sm font-semibold">Top holders</h2></div><div className="grid grid-cols-[28px_1fr_72px] gap-3 px-4 py-2 border-b border-border bg-deep/45 text-[9px] uppercase tracking-[0.1em] text-mutedtext"><span>#</span><span>Address</span><span>Share</span></div>{topHolders.slice(0, 8).map((holder) => <div key={holder.address} className="grid grid-cols-[28px_1fr_72px] gap-3 px-4 py-2.5 border-b border-border last:border-0 text-[11px] font-mono"><span className="text-mutedtext">{holder.rank}</span><span className="truncate">{holder.address}</span><span className="text-right">{holder.pct}%</span></div>)}</div>
           </section>
 
@@ -274,6 +292,37 @@ function OriginCell({ label, value, accent = false }) { return <div className="b
 function Field({ label, children }) { return <label><span className="text-[10px] uppercase tracking-[0.13em] text-mutedtext block mb-1.5">{label}</span>{children}</label>; }
 function ConfigRow({ label, value }) { return <div className="flex items-center justify-between text-xs"><span className="text-mutedtext">{label}</span><span>{value}</span></div>; }
 function AboutLink({ icon: Icon, label }) { return <button className="inline-flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-[11px] text-secondarytext hover:text-primary hover:border-primary/35">{Icon && <Icon size={12} />}{label}</button>; }
+
+function tradePrice(trade, market) {
+  if (!market) return NaN;
+  const tokenIsCurrency0 = market.token_address.toLowerCase() < market.pair_address.toLowerCase();
+  const tokenRaw = BigInt(tokenIsCurrency0 ? trade.amount0 : trade.amount1);
+  const pairRaw = BigInt(tokenIsCurrency0 ? trade.amount1 : trade.amount0);
+  const tokenAmount = Math.abs(Number(formatUnits(tokenRaw, 18)));
+  const pairAmount = Math.abs(Number(formatUnits(pairRaw, 18)));
+  return tokenAmount > 0 ? pairAmount / tokenAmount : NaN;
+}
+
+function RecentTrades({ trades, indexedMarket, fallback, quote, ticker, fallbackPrice }) {
+  const rows = trades.length ? trades.slice(0, 8).map((trade) => {
+    const tokenIsCurrency0 = indexedMarket.token_address.toLowerCase() < indexedMarket.pair_address.toLowerCase();
+    const tokenRaw = BigInt(tokenIsCurrency0 ? trade.amount0 : trade.amount1);
+    const pairRaw = BigInt(tokenIsCurrency0 ? trade.amount1 : trade.amount0);
+    return {
+      key: `${trade.transaction_hash}-${trade.log_index}`,
+      time: `#${trade.block_number}`,
+      type: tokenRaw < 0n ? "buy" : "sell",
+      wallet: shortAddress(trade.sender),
+      pair: formatDisplay(Math.abs(Number(formatUnits(pairRaw, 18)))),
+      token: formatDisplay(Math.abs(Number(formatUnits(tokenRaw, 18)))),
+      price: formatDisplay(tradePrice(trade, indexedMarket)),
+    };
+  }) : fallback.slice(0, 8).map((trade, index) => ({
+    key: `${trade.wallet}-${index}`, time: `${trade.time} ago`, type: trade.type, wallet: trade.wallet,
+    pair: (0.38 + index * 0.27).toFixed(2), token: (6482 + index * 9043).toLocaleString(), price: fallbackPrice,
+  }));
+  return <div className="border border-border bg-card rounded-sm overflow-hidden"><div className="px-4 py-3 border-b border-border flex items-center justify-between"><h2 className="text-sm font-semibold">Recent trades</h2>{trades.length > 0 && <span className="text-[9px] tracking-[0.12em] text-primary">INDEXED ONCHAIN</span>}</div><div className="grid grid-cols-[60px_54px_minmax(105px,1fr)_72px_86px_90px] gap-2 px-4 py-2 border-b border-border bg-deep/45 text-[9px] uppercase tracking-[0.1em] text-mutedtext"><span>Time</span><span>Type</span><span>Wallet</span><span>{quote}</span><span>${ticker}</span><span>Price</span></div>{rows.map((trade) => <div key={trade.key} className="grid grid-cols-[60px_54px_minmax(105px,1fr)_72px_86px_90px] gap-2 px-4 py-2 border-b border-border last:border-0 text-[11px] font-mono"><span className="text-mutedtext">{trade.time}</span><span className={trade.type === "sell" ? "text-destructive" : "text-primary"}>{trade.type.toUpperCase()}</span><span className="truncate text-secondarytext">{trade.wallet}</span><span>{trade.pair}</span><span>{trade.token}</span><span>{trade.price}</span></div>)}</div>;
+}
 
 function stageLabel(stage) {
   return ({ approval: "Approve token", quoting: "Refreshing quote", signature: "Confirm in wallet", confirming: "Confirming onchain" })[stage] || "Preparing trade";

@@ -14,7 +14,7 @@ export default function TokenRow({ token, index = 0 }) {
   const pair = pairAssets.find((asset) => asset.symbol === pairSymbol);
   return (
     <Link
-      to={`/token/${token.id}`}
+      to={token.href || `/token/${token.id}`}
       className="group market-token-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 py-3 border-b border-border last:border-0 hover:bg-secondary/40 transition-colors animate-flare-fade"
       style={{ animationDelay: `${index * 30}ms` }}
     >

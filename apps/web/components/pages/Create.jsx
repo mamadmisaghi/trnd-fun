@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 import { explorerUrl, getTestnetPair } from "@/lib/protocol/robinhood-testnet";
 import { shortAddress, useViralWallet } from "@/lib/protocol/ViralWalletProvider";
 import { confirmManualLaunch } from "@/lib/launchState";
+import { indexTransaction } from "@/lib/indexer/client";
 
 const factorySnapshot = {
   creationFee: "0.001 ETH",
@@ -156,6 +157,7 @@ export default function Create() {
         txHash: result.hash,
         poolId: result.poolId,
       });
+      indexTransaction(result.hash).catch(() => {});
       setLaunchResult(result);
       setPhase("success");
     } catch (error) {
