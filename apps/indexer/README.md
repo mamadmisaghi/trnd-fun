@@ -46,6 +46,11 @@ blocked unless exactly five distinct, non-zero creator recipients exist.
 `testnet_trade_count_v1` is intentionally a testnet-only ranking rule; a
 production launch must replace it with the approved normalized scoring model.
 
+CI also ingests a single historical launch block from chain 46630 into an
+ephemeral PostgreSQL database. This read-only smoke test verifies live RPC log
+decoding, contract metadata and holder-transfer persistence without sending a
+transaction.
+
 ## Container image
 
 Build with `docker build -t trnd-indexer .`. Run migrations as a one-off command

@@ -211,5 +211,5 @@ export function createIndexer(config, db, eventHub, logger = console) {
     }
   }
 
-  return { run, syncOnce, stop: () => { stopped = true; }, client };
+  return { run, syncOnce, ingestRange, stop: () => { stopped = true; }, client };
 }

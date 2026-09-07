@@ -39,4 +39,8 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm test
       - run: npm run migrate
+      - run: npm run test:chain
+        env:
+          RPC_URL: https://rpc.testnet.chain.robinhood.com
+          CHAIN_ID: 46630
       - run: for file in src/*.js test/*.js; do node --check "$file"; done
