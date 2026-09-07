@@ -162,4 +162,3 @@ export default function Navigation({ onSearch, onNotifications, onPortfolio }) {
     </>
   );
 }
-
