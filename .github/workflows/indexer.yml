@@ -13,6 +13,21 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: viral
+          POSTGRES_PASSWORD: viral
+          POSTGRES_DB: viral_terminal_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U viral -d viral_terminal_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://viral:viral@localhost:5432/viral_terminal_test
     defaults:
       run:
         working-directory: apps/indexer
@@ -21,7 +36,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm test
-      - run: node --check src/indexer.js
-      - run: node --check src/api.js
+      - run: npm run migrate
+      - run: npm run test:chain
+        env:
+          RPC_URL: https://rpc.testnet.chain.robinhood.com
+          CHAIN_ID: 46630
+      - run: for file in src/*.js test/*.js; do node --check "$file"; done
