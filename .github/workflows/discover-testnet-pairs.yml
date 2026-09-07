@@ -1,0 +1,98 @@
+name: Discover Robinhood testnet pair assets
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  discover:
+    if: contains(github.event.head_commit.message, '[discover-pairs]')
+    runs-on: ubuntu-latest
+    env:
+      DEPLOYER: "0x66B6c5e00B1242B9681BCB3bC3bCc3C87C138CaE"
+      EXPLORER: "https://explorer.testnet.chain.robinhood.com"
+      PUBLIC_RPC: "https://rpc.testnet.chain.robinhood.com"
+      SUPPORT_TX: "0x300bd655caf4548c296b047bdf2c9d6fdb7d02e6a5dd50ca9a7a13ca4bda5351"
+      TEST_WETH: "0xfCEDD91c7d8a32c0747D8B076b394EfDC5833C60"
+      TEST_USDG: "0x20A887523fbbF0024eB46ee672DF15A95521E680"
+      VIRAL_TEST: "0x06353b828dBeB40908f5e08c56a6F7bB60fE92e3"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.1
+
+      - name: Discover nonzero ERC-20 balances
+        env:
+          SECRET_RPC: ${{ secrets.RH_TESTNET_RPC_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RPC_URL="${SECRET_RPC:-$PUBLIC_RPC}"
+          mkdir -p contracts/deployments/46630
+          work=$(mktemp -d)
+          addresses="$work/addresses.txt"
+          : > "$addresses"
+
+          for attempt in 1 2 3; do
+            if curl --fail --silent --show-error --max-time 30 \
+              "$EXPLORER/api/v2/addresses/$DEPLOYER/token-balances" > "$work/balances.json"; then
+              jq -r 'if type=="array" then .[] else .items[] end | .token.address // empty' "$work/balances.json" >> "$addresses" || true
+              break
+            fi
+            sleep $((attempt * 5))
+          done
+
+          if [ ! -s "$addresses" ]; then
+            latest=$(cast block-number --rpc-url "$RPC_URL")
+            support_hex=$(cast receipt --rpc-url "$RPC_URL" "$SUPPORT_TX" --json | jq -r '.blockNumber')
+            support_block=$((support_hex))
+            start=$((support_block > 100000 ? support_block - 100000 : 0))
+            transfer_topic="0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            receiver_topic="0x000000000000000000000000${DEPLOYER#0x}"
+            receiver_topic=$(printf '%s' "$receiver_topic" | tr '[:upper:]' '[:lower:]')
+            for ((from=start; from<=latest; from+=5000)); do
+              to=$((from + 4999)); [ "$to" -gt "$latest" ] && to=$latest
+              from_hex=$(printf '0x%x' "$from")
+              to_hex=$(printf '0x%x' "$to")
+              jq -nc --arg from "$from_hex" --arg to "$to_hex" --arg sig "$transfer_topic" --arg recipient "$receiver_topic" \
+                '{jsonrpc:"2.0",id:1,method:"eth_getLogs",params:[{fromBlock:$from,toBlock:$to,topics:[$sig,null,$recipient]}]}' \
+                | curl --fail --silent --show-error --max-time 30 -H 'content-type: application/json' --data-binary @- "$RPC_URL" \
+                | jq -r '.result[]?.address' >> "$addresses"
+            done
+          fi
+
+          sort -fu "$addresses" -o "$addresses"
+          assets='[]'
+          while read -r token; do
+            [ -z "$token" ] && continue
+            balance=$(cast call --rpc-url "$RPC_URL" "$token" 'balanceOf(address)(uint256)' "$DEPLOYER" 2>/dev/null || echo 0)
+            [ "$balance" = "0" ] && continue
+            symbol=$(cast call --rpc-url "$RPC_URL" "$token" 'symbol()(string)' 2>/dev/null || echo UNKNOWN)
+            name=$(cast call --rpc-url "$RPC_URL" "$token" 'name()(string)' 2>/dev/null || echo Unknown)
+            decimals=$(cast call --rpc-url "$RPC_URL" "$token" 'decimals()(uint8)' 2>/dev/null || echo 18)
+            kind="RWA_CANDIDATE"
+            case "${token,,}" in
+              "${TEST_WETH,,}") kind="TEST_WETH" ;;
+              "${TEST_USDG,,}") kind="TEST_USDG" ;;
+              "${VIRAL_TEST,,}") kind="VIRAL_LAUNCH_TOKEN" ;;
+            esac
+            assets=$(jq -nc --argjson old "$assets" --arg address "$token" --arg symbol "$symbol" --arg name "$name" --arg balance "$balance" --argjson decimals "$decimals" --arg kind "$kind" '$old + [{address:$address,symbol:$symbol,name:$name,decimals:$decimals,balance:$balance,classification:$kind}]')
+          done < "$addresses"
+
+          jq -n --arg observedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg wallet "$DEPLOYER" --argjson assets "$assets" \
+            '{chainId:46630,network:"Robinhood Chain Testnet",observedAt:$observedAt,wallet:$wallet,assets:$assets,rwaCandidates:[$assets[]|select(.classification=="RWA_CANDIDATE")]}' \
+            > contracts/deployments/46630/wallet-assets.json
+          jq . contracts/deployments/46630/wallet-assets.json
+          test "$(jq '.rwaCandidates | length' contracts/deployments/46630/wallet-assets.json)" -gt 0
+
+      - name: Commit discovery report
+        run: |
+          git config user.name "viral-terminal-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add contracts/deployments/46630/wallet-assets.json
+          git commit -m "chore(testnet): record faucet pair assets"
+          git push
