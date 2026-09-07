@@ -1,0 +1,226 @@
+{
+  "chainId": 46630,
+  "network": "Robinhood Chain Testnet",
+  "observedAt": "2026-09-07T06:17:15Z",
+  "wallet": "0x66B6c5e00B1242B9681BCB3bC3bCc3C87C138CaE",
+  "assets": [
+    {
+      "address": "0x06353b828dbeb40908f5e08c56a6f7bb60fe92e3",
+      "symbol": "\"VIRALTEST\"",
+      "name": "\"ViralTerminal Testnet Genesis\"",
+      "decimals": 18,
+      "balance": "214604762986053317113673 [2.146e23]",
+      "classification": "VIRAL_LAUNCH_TOKEN"
+    },
+    {
+      "address": "0x0ff139e8df43f6c77c83e43fa119e8f2c0942888",
+      "symbol": "\"GRSP\"",
+      "name": "\"Grandpa Reviews Gen Z\"",
+      "decimals": 18,
+      "balance": "707642217083891675076238 [7.076e23]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0x1fbe1a0e43594b3455993b5de5fd0a7a266298d0",
+      "symbol": "\"PLTR\"",
+      "name": "\"Palantir Technologies\"",
+      "decimals": 18,
+      "balance": "15000000000000000000 [1.5e19]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0x3ae6ed828292a5f8f84952ccf4b4c78bdb2b8527",
+      "symbol": "\"6566\"",
+      "name": "\"666\"",
+      "decimals": 18,
+      "balance": "670810575250496982751332 [6.708e23]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0x3b8262a63d25f0477c4dde23f83cfe22cb768c93",
+      "symbol": "\"NFLX\"",
+      "name": "\"Netflix\"",
+      "decimals": 18,
+      "balance": "15000000000000000000 [1.5e19]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0x47deeeb532bb1ec0f6fd8718a8c1d069fca1ccc8",
+      "symbol": "\"T3SP\"",
+      "name": "\"The 3AM Thoughts Account\"",
+      "decimals": 18,
+      "balance": "310847968904268279 [3.108e17]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0x5884ad2f920c162cfbbacc88c9c51aa75ec09e02",
+      "symbol": "\"AMZN\"",
+      "name": "\"Amazon\"",
+      "decimals": 18,
+      "balance": "15000000000000000000 [1.5e19]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0x71178bac73cbeb415514eb542a8995b82669778d",
+      "symbol": "\"AMD\"",
+      "name": "\"AMD\"",
+      "decimals": 18,
+      "balance": "15000000000000000000 [1.5e19]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0x8cebab20dd17e62650c1b1d2d754d26f48239b24",
+      "symbol": "\"12\"",
+      "name": "\"12\"",
+      "decimals": 18,
+      "balance": "7269550392353793 [7.269e15]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0xc4ebd8234cc8a1f13c6dcfa5fc5827caab82794d",
+      "symbol": "\"ASDASD\"",
+      "name": "\"asd\"",
+      "decimals": 18,
+      "balance": "729739899031511876349884 [7.297e23]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0xc9931843b467ff97de2b32bc6d646da4e2c0c6b1",
+      "symbol": "\"TDSP\"",
+      "name": "\"Tiny Desk but Its\"",
+      "decimals": 18,
+      "balance": "146033232827565441566713 [1.46e23]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0xc9f9c86933092bbbfff3ccb4b105a4a94bf3bd4e",
+      "symbol": "\"TSLA\"",
+      "name": "\"Tesla\"",
+      "decimals": 18,
+      "balance": "15000000000000000000 [1.5e19]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0xf1a4e15f319a7485cb4e0e8e4dfac5bcb822dc7b",
+      "symbol": "\"JSNV\"",
+      "name": "\"Jensen Says AI Compute\"",
+      "decimals": 18,
+      "balance": "146033232827565441566713 [1.46e23]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0xf9d6092c9122c0c9630445d597b976102043f8b9",
+      "symbol": "\"ROBOTAXI\"",
+      "name": "\"New Robotaxi Interior\"",
+      "decimals": 18,
+      "balance": "138658839694790457114248 [1.386e23]",
+      "classification": "RWA_CANDIDATE"
+    }
+  ],
+  "rwaCandidates": [
+    {
+      "address": "0x0ff139e8df43f6c77c83e43fa119e8f2c0942888",
+      "symbol": "\"GRSP\"",
+      "name": "\"Grandpa Reviews Gen Z\"",
+      "decimals": 18,
+      "balance": "707642217083891675076238 [7.076e23]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0x1fbe1a0e43594b3455993b5de5fd0a7a266298d0",
+      "symbol": "\"PLTR\"",
+      "name": "\"Palantir Technologies\"",
+      "decimals": 18,
+      "balance": "15000000000000000000 [1.5e19]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0x3ae6ed828292a5f8f84952ccf4b4c78bdb2b8527",
+      "symbol": "\"6566\"",
+      "name": "\"666\"",
+      "decimals": 18,
+      "balance": "670810575250496982751332 [6.708e23]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0x3b8262a63d25f0477c4dde23f83cfe22cb768c93",
+      "symbol": "\"NFLX\"",
+      "name": "\"Netflix\"",
+      "decimals": 18,
+      "balance": "15000000000000000000 [1.5e19]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0x47deeeb532bb1ec0f6fd8718a8c1d069fca1ccc8",
+      "symbol": "\"T3SP\"",
+      "name": "\"The 3AM Thoughts Account\"",
+      "decimals": 18,
+      "balance": "310847968904268279 [3.108e17]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0x5884ad2f920c162cfbbacc88c9c51aa75ec09e02",
+      "symbol": "\"AMZN\"",
+      "name": "\"Amazon\"",
+      "decimals": 18,
+      "balance": "15000000000000000000 [1.5e19]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0x71178bac73cbeb415514eb542a8995b82669778d",
+      "symbol": "\"AMD\"",
+      "name": "\"AMD\"",
+      "decimals": 18,
+      "balance": "15000000000000000000 [1.5e19]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0x8cebab20dd17e62650c1b1d2d754d26f48239b24",
+      "symbol": "\"12\"",
+      "name": "\"12\"",
+      "decimals": 18,
+      "balance": "7269550392353793 [7.269e15]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0xc4ebd8234cc8a1f13c6dcfa5fc5827caab82794d",
+      "symbol": "\"ASDASD\"",
+      "name": "\"asd\"",
+      "decimals": 18,
+      "balance": "729739899031511876349884 [7.297e23]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0xc9931843b467ff97de2b32bc6d646da4e2c0c6b1",
+      "symbol": "\"TDSP\"",
+      "name": "\"Tiny Desk but Its\"",
+      "decimals": 18,
+      "balance": "146033232827565441566713 [1.46e23]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0xc9f9c86933092bbbfff3ccb4b105a4a94bf3bd4e",
+      "symbol": "\"TSLA\"",
+      "name": "\"Tesla\"",
+      "decimals": 18,
+      "balance": "15000000000000000000 [1.5e19]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0xf1a4e15f319a7485cb4e0e8e4dfac5bcb822dc7b",
+      "symbol": "\"JSNV\"",
+      "name": "\"Jensen Says AI Compute\"",
+      "decimals": 18,
+      "balance": "146033232827565441566713 [1.46e23]",
+      "classification": "RWA_CANDIDATE"
+    },
+    {
+      "address": "0xf9d6092c9122c0c9630445d597b976102043f8b9",
+      "symbol": "\"ROBOTAXI\"",
+      "name": "\"New Robotaxi Interior\"",
+      "decimals": 18,
+      "balance": "138658839694790457114248 [1.386e23]",
+      "classification": "RWA_CANDIDATE"
+    }
+  ]
+}
