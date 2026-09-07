@@ -1,0 +1,28 @@
+{
+  "chainId": 46630,
+  "network": "Robinhood Chain Testnet",
+  "validatedAt": "2026-09-07T14:13:18Z",
+  "workflowRunId": 34131589874,
+  "result": "success",
+  "market": {
+    "token": "0x018129F6970cB20877C987d22E4ad7Ef9Ddba791",
+    "pair": "USDG",
+    "poolId": "0x86ed7d66e7a22caaf660e67a6b21bba19f4ee5b03882717569dde2b6022e2686"
+  },
+  "outputs": {
+    "creatorBuyTokens": "72273610132810035093046",
+    "secondBuyTokens": "72263163938350961956860",
+    "sellEthOutWei": "48021555555555",
+    "usdgFeesClaimed": "13502",
+    "tokenFeesClaimed": "541973729537632214678"
+  },
+  "transactions": {
+    "launchAndCreatorBuyWithEth": "0xc558c8479fc31ef1e2c76b41c4d2b6fa8a4dd172d2294a3eaaf3b9ea3f7eaaa6",
+    "secondBuyWithEth": "0x0f8ac29b31fe43b60acd0b8331265605f64cbc8fff6143b1ae42a3b9eb644be2",
+    "sellApproval": "0xae8a4dc5c27154d25229b07318927446ea4aca13849355c0296dda845e8bfb99",
+    "sellToEth": "0x53833379d0b0d2a1ba52cd7247105394a58ba7d5d8655c6b73b6704a6c562b59",
+    "collectFees": "0xb7e78bbc77fc752a28bc900e72b7134bcc2a3a35c7007701f63f2b93acafa5fb",
+    "claimUsdg": "0x0224907b970ee0e5dfed196d6f2c4bb89115070f601e9dc3133a5e7d1c7c02e5",
+    "claimToken": "0xbd4d52896c23b4207a660d4cabd220d9ce1d6b71650cbbf0fc122b6eed8dceeb"
+  }
+}
