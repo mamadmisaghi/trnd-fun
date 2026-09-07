@@ -4,7 +4,7 @@ Date: 2026-09-07
 Scope: current V2 launchpad contracts, fee collection and claims, launch
 forwarding, ETH route composition, and the Robinhood Chain testnet adapter.
 
-Deployment tracking: testnet ETH-route deployment requested after green contract and web CI.
+Deployment tracking: testnet ETH-route deployment and address reconciliation requested after green contract and web CI.
 
 ## Result
 
