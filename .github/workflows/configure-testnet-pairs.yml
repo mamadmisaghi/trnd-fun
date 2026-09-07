@@ -1,0 +1,69 @@
+name: Configure and validate testnet pairs
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: configure-testnet-pairs
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    if: contains(github.event.head_commit.message, '[configure-pairs]')
+    runs-on: ubuntu-latest
+    env:
+      RPC_URL: ${{ secrets.RH_TESTNET_RPC_URL }}
+      PRIVATE_KEY: ${{ secrets.RH_TESTNET_DEPLOYER_PRIVATE_KEY }}
+      FACTORY: "0x8D196Fc239AE5C364eF4E8b76A987Acd6065929C"
+      ROUTER: "0x55Bea0D582C48815585164AC476C2C0c71506B5d"
+      PAIR_REGISTRY: "0x8e84B45d98A2b8233Aa1bA8BB16b6678E1C947aa"
+      USDG: "0x20A887523fbbF0024eB46ee672DF15A95521E680"
+      RWA_TOKEN: "0xc9f9c86933092bbbfff3ccb4b105a4a94bf3bd4e"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.1
+      - name: Validate secrets
+        run: |
+          test -n "$PRIVATE_KEY"
+          if [ -z "$RPC_URL" ]; then echo "RPC_URL=https://rpc.testnet.chain.robinhood.com" >> "$GITHUB_ENV"; fi
+      - name: Build pair configuration script
+        working-directory: contracts
+        run: forge build --sizes
+      - name: Configure and exercise USDG and TSLA
+        working-directory: contracts
+        run: forge script script/ConfigureTestnetPairs.s.sol:ConfigureTestnetPairs --rpc-url "$RPC_URL" --broadcast -vvv
+      - name: Record configuration
+        shell: bash
+        run: |
+          run_file="contracts/broadcast/ConfigureTestnetPairs.s.sol/46630/run-latest.json"
+          test -f "$run_file"
+          txs=$(jq '[.transactions[] | select(.hash != null) | .hash]' "$run_file")
+          usdg_enabled=$(cast call --rpc-url "$RPC_URL" "$PAIR_REGISTRY" 'isEnabled(address)(bool)' "$USDG")
+          rwa_enabled=$(cast call --rpc-url "$RPC_URL" "$PAIR_REGISTRY" 'isEnabled(address)(bool)' "$RWA_TOKEN")
+          usdg_phantom=$(cast call --rpc-url "$RPC_URL" "$FACTORY" 'previewQuoteEconomics(uint256,address)(uint256)' 0 "$USDG")
+          rwa_phantom=$(cast call --rpc-url "$RPC_URL" "$FACTORY" 'previewQuoteEconomics(uint256,address)(uint256)' 0 "$RWA_TOKEN")
+          test "$usdg_enabled" = "true"
+          test "$rwa_enabled" = "true"
+          jq -n \
+            --arg configuredAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg usdg "$USDG" --arg rwa "$RWA_TOKEN" \
+            --arg usdgPhantom "$usdg_phantom" --arg rwaPhantom "$rwa_phantom" \
+            --argjson transactions "$txs" \
+            '{chainId:46630,network:"Robinhood Chain Testnet",configuredAt:$configuredAt,pairs:{USDG:{address:$usdg,decimals:6,enabled:true,phantomQuote:$usdgPhantom},TSLA:{address:$rwa,decimals:18,enabled:true,phantomQuote:$rwaPhantom}},transactions:$transactions,lifecycleValidated:["launch","creator_buy","buy","sell","collect","claim"]}' \
+            > contracts/deployments/46630/pairs.json
+          jq . contracts/deployments/46630/pairs.json
+      - name: Commit pair manifest
+        run: |
+          git config user.name "viral-terminal-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add contracts/deployments/46630/pairs.json
+          git commit -m "ops(testnet): record USDG and TSLA pair activation"
+          git push
