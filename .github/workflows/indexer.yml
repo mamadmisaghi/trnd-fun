@@ -46,3 +46,6 @@ jobs:
           RPC_URL: https://rpc.testnet.chain.robinhood.com
           CHAIN_ID: 46630
       - run: for file in src/*.js test/*.js integration/*.js; do node --check "$file"; done
+      - run: docker build -t trnd-indexer-ci .
+      - run: docker compose config
+

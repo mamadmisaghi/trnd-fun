@@ -35,6 +35,8 @@ export function loadConfig() {
       intervalMs: integer("KEEPER_INTERVAL_MS", 60_000),
       collectMinAgeMs: integer("KEEPER_COLLECT_MIN_AGE_MS", 300_000),
       confirmations: integer("KEEPER_CONFIRMATIONS", 2),
+      maxAttempts: integer("KEEPER_MAX_ATTEMPTS", 5),
+      retryDelayMs: integer("KEEPER_RETRY_DELAY_MS", 60_000),
       rankingMode: process.env.REWARD_RANKING_MODE || "testnet_trade_count_v1",
     },
     contracts: {
@@ -48,3 +50,4 @@ export function loadConfig() {
     },
   };
 }
+
