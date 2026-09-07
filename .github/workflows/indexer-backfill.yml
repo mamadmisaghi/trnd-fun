@@ -32,6 +32,7 @@ jobs:
       BLOCK_BATCH_SIZE: 1000
       KEEPER_ENABLED: "false"
       BACKFILL_REPORT_PATH: backfill-report.json
+      RECONCILIATION_REPORT_PATH: reconciliation-report.json
     defaults:
       run:
         working-directory: apps/indexer
@@ -43,8 +44,11 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run migrate
       - run: npm run backfill
+      - run: npm run reconcile
       - uses: actions/upload-artifact@v4
         with:
           name: robinhood-testnet-backfill-evidence
-          path: apps/indexer/backfill-report.json
+          path: |
+            apps/indexer/backfill-report.json
+            apps/indexer/reconciliation-report.json
           if-no-files-found: error

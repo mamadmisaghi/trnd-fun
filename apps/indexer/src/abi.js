@@ -24,6 +24,16 @@ export const tokenAbi = parseAbi([
   "function decimals() view returns (uint8)",
 ]);
 
+export const tokenReconciliationAbi = parseAbi([
+  "function totalSupply() view returns (uint256)",
+  "function balanceOf(address account) view returns (uint256)",
+]);
+
+export const feeEscrowViewAbi = parseAbi([
+  "function balanceOf(address recipient) view returns (uint256)",
+  "function balanceOfToken(address recipient, address token) view returns (uint256)",
+]);
+
 export const factoryViewAbi = parseAbi([
   "function getLaunchedToken(address token) view returns ((address token,address deployer,address creatorFeeRecipient,address pairToken,uint256 phantomQuote,uint24 poolFee,int24 tickSpacing,int24 tickLower,int24 tickUpper,uint128 liquidity,uint256 positionId,uint16 baseFeeBps,uint16 creatorTaxBps,uint16 protocolFeeShareBps,address protocolFeeRecipient,uint64 launchedAt,bool exists))",
 ]);

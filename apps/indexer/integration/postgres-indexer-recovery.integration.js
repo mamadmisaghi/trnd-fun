@@ -103,6 +103,11 @@ function makeFork(label) {
     }),
   ] : [
     encodedLog({
+      event: eventByName.get("ZapBuy"),
+      args: { poolId: POOL_ID, buyer: BUYER, ethIn: 1n, tokensOut: 50n },
+      address: ROUTER, blockNumber: 102, transaction: 4, logIndex: 1, blockHash: blocks.get(102).hash,
+    }),
+    encodedLog({
       event: swapEvent,
       args: { id: POOL_ID, sender: ROUTER, amount0: -50n, amount1: 40n, sqrtPriceX96: Q96 * 3n, liquidity: 9_800n, tick: 2, fee: 10_000 },
       address: POOL_MANAGER, blockNumber: 102, transaction: 4, logIndex: 0, blockHash: blocks.get(102).hash,
@@ -193,6 +198,7 @@ test("full configured backfill is restart-idempotent and reorg rebuilds determin
     }
     assert.equal(rebuilt.trades.length, 1);
     assert.equal(rebuilt.trades[0].transaction_hash, `0x${(4).toString(16).padStart(64, "0")}`);
+    assert.equal(rebuilt.trades[0].sender, BUYER.toLowerCase());
     assert.deepEqual(rebuilt.holder_balances.map(({ holder_address, balance }) => [holder_address, balance]), [
       [DEPLOYER.toLowerCase(), "900"],
       [BUYER.toLowerCase(), "100"],
