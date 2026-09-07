@@ -1,0 +1,50 @@
+{
+  "chainId": 46630,
+  "network": "Robinhood Chain Testnet",
+  "configuredAt": "2026-09-07T06:26:08Z",
+  "pairs": {
+    "USDG": {
+      "address": "0x20A887523fbbF0024eB46ee672DF15A95521E680",
+      "decimals": 6,
+      "enabled": true,
+      "phantomQuote": "6100650000 [6.1e9]"
+    },
+    "TSLA": {
+      "address": "0xc9f9c86933092bbbfff3ccb4b105a4a94bf3bd4e",
+      "decimals": 18,
+      "enabled": true,
+      "phantomQuote": "10000000000000000000 [1e19]"
+    }
+  },
+  "transactions": [
+    "0x7b2ebacfa79e91313b8c47ad26ac30a5df7148d6c98083501c30d8fff1b33502",
+    "0xaa22d778940188109b616f5b7c9f3d7b503920fb592237d36e297f210b884e34",
+    "0xf92a3f9a83cbdc18bb7eeef38300d22b26df9408cd416ceb1e110ce5be9ddc1b",
+    "0xe801981a9be7a7db2fb2d52f54e6618c2b57bdd4fbc010b66a25b2978aa0fb67",
+    "0x5bdd41757251061535cba59336f25f51ff786eccf9a4a83ea7d2b9982508bb17",
+    "0x8bf5181cce0c5cc890ba9e48358f21dca7cb67ab7818cb958772f3bb9052e288",
+    "0xf81eb647046df153f867396df7e14b28dd21887235bee00f735a2604aad24d23",
+    "0x53534ce91e3627ff4c886e583be5e6a0b0dd1484a291868a839cd5cafc786797",
+    "0xf645d8b8717fbe984eca8df76b1f59988088bf0528d9916efbb48bdad1862d4c",
+    "0x0b3841f25c83a95c69dd8e9c0847ca9f90b691e49cc5dff1b5cbb7a8208a78e7",
+    "0x61f63081ec37065fdcf1ca7e9cc0d86f32612c32e20fb8d4e20ef641bc03689f",
+    "0x33b374628c0cc3973c8449420d3951e33765aebb33fc70cf4edce1db8aa73f4c",
+    "0xd72c95462ed77b4ebba5893e4e358b071e374abccd464df5855d66201d67f312",
+    "0x81df5e2f881967cf302aaf76cee52e43af5d6737fb9600e6516aa8dd926c3279",
+    "0x22ea3dd832c51cbd910458ffea0494c01b508a8ba0ed804286dcbc406b604f47",
+    "0x6d4ebd99b87e4b6ea37c44e16775d45221afbf71b6f9ec7a9714b3b50418346a",
+    "0xc927824ce192d97174f70dbd01c4acb4ede7d08b5739182407c88193bcc2d7bf",
+    "0x8c76865ec970d3f42bf2abfdf531722c064af51df73fb703ed70dba459b87ac2",
+    "0x60251981716241cc750872367c09d499773571e1743bae441c5f111e59aca50e",
+    "0x77f50bc01f9d477bdba6f7330d67e20f7b092f38b582d51dc90eb8ab2953e1ec",
+    "0x75c6ebd42ba62809e689b3b601efc44bfb0988a322dc0126f39031dc2b411b6b"
+  ],
+  "lifecycleValidated": [
+    "launch",
+    "creator_buy",
+    "buy",
+    "sell",
+    "collect",
+    "claim"
+  ]
+}
