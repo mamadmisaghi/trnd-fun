@@ -45,7 +45,9 @@ export const lockerKeeperAbi = parseAbi([
 
 export const rewardKeeperAbi = parseAbi([
   "function currentEpoch() view returns (uint256)",
+  "function distributor() view returns (address)",
   "function epochFunding(uint256 epochId, address currency) view returns (uint256)",
   "function epochFinalized(uint256 epochId, address currency) view returns (bool)",
   "function finalizeEpoch(uint256 epochId, address currency, address[5] recipients) returns (uint256[5] amounts)",
 ]);
+

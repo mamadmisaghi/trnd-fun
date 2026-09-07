@@ -4,6 +4,9 @@ import { lockerKeeperAbi, rewardKeeperAbi } from "./abi.js";
 
 const lower = (value) => value.toLowerCase();
 const json = (value) => JSON.stringify(value, (_, item) => typeof item === "bigint" ? item.toString() : item);
+const safeError = (error) => (error?.shortMessage || error?.message || "Unknown keeper error")
+  .replace(/https?:\/\/[^\s)]+/gi, "[redacted-url]")
+  .slice(0, 500);
 
 export function epochBounds(epochId) {
   const start = Number(BigInt(epochId) * 86_400n);
@@ -20,22 +23,26 @@ export function collectActionKey(token, now, intervalMs, mode) {
   return `collect:${mode}:${lower(token)}:${Math.floor(now / intervalMs)}`;
 }
 
-async function reserveAction(db, runId, action) {
+async function reserveAction(db, runId, action, maxAttempts) {
   const result = await db.query(
     `INSERT INTO keeper_actions(run_id,action_key,action_type,subject,status,attempts,details)
      VALUES($1,$2,$3,$4,'planned',1,$5::jsonb)
      ON CONFLICT(action_key) DO UPDATE SET run_id=excluded.run_id,status='planned',attempts=keeper_actions.attempts+1,
        error=NULL,updated_at=now(),details=keeper_actions.details||excluded.details
-     WHERE keeper_actions.status IN ('blocked','failed') RETURNING id`,
-    [runId, action.key, action.type, action.subject, json(action.details || {})],
+     WHERE keeper_actions.status IN ('blocked','failed')
+       AND keeper_actions.attempts<$6
+       AND (keeper_actions.next_attempt_at IS NULL OR keeper_actions.next_attempt_at<=now())
+     RETURNING id`,
+    [runId, action.key, action.type, action.subject, json(action.details || {}), maxAttempts],
   );
   return result.rows[0]?.id;
 }
 
 async function updateAction(db, id, status, fields = {}) {
   await db.query(
-    `UPDATE keeper_actions SET status=$2,transaction_hash=$3,error=$4,details=details||$5::jsonb,updated_at=now() WHERE id=$1`,
-    [id, status, fields.transactionHash || null, fields.error || null, json(fields.details || {})],
+    `UPDATE keeper_actions SET status=$2,transaction_hash=$3,error=$4,details=details||$5::jsonb,
+       next_attempt_at=$6,updated_at=now() WHERE id=$1`,
+    [id, status, fields.transactionHash || null, fields.error || null, json(fields.details || {}), fields.nextAttemptAt || null],
   );
 }
 
@@ -45,6 +52,7 @@ async function rankCreators(db, chainId, epochId, scoreVersion) {
     `SELECT l.creator_fee_recipient creator_address,count(*)::numeric score
      FROM trades t JOIN launches l ON l.chain_id=t.chain_id AND l.token_address=t.token_address
      WHERE t.chain_id=$1 AND t.block_time>=$2 AND t.block_time<$3 AND l.creator_fee_recipient IS NOT NULL
+       AND lower(COALESCE(t.sender,''))<>lower(l.creator_fee_recipient)
      GROUP BY l.creator_fee_recipient ORDER BY score DESC,l.creator_fee_recipient ASC LIMIT 5`,
     [chainId, start, end],
   );
@@ -67,20 +75,24 @@ export function createKeeper(config, db, publicClient, logger = console) {
   }
   const account = config.keeper.dryRun ? null : privateKeyToAccount(config.keeper.privateKey);
   const wallet = account ? createWalletClient({ account, transport: http(config.rpcUrl) }) : null;
+  const maxAttempts = Math.max(1, config.keeper.maxAttempts || 5);
+  const retryDelayMs = Math.max(1_000, config.keeper.retryDelayMs || 60_000);
   let stopped = false;
 
-  async function submit(actionId, request) {
+  async function submit(actionId, request, simulationAccount = account) {
     try {
-      const simulated = await publicClient.simulateContract({ ...request, account });
-      await updateAction(db, actionId, "simulated");
+      const simulated = await publicClient.simulateContract({ ...request, account: simulationAccount || undefined });
+      await updateAction(db, actionId, "simulated", { details: { simulation: "passed" } });
+      if (config.keeper.dryRun) return true;
       const hash = await wallet.writeContract(simulated.request);
       await updateAction(db, actionId, "submitted", { transactionHash: hash });
-      await publicClient.waitForTransactionReceipt({ hash, confirmations: config.keeper.confirmations });
-      await updateAction(db, actionId, "confirmed", { transactionHash: hash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash, confirmations: config.keeper.confirmations });
+      await updateAction(db, actionId, "confirmed", { transactionHash: hash, details: { receiptStatus: receipt.status } });
       return true;
     } catch (error) {
-      await updateAction(db, actionId, "failed", { error: error.shortMessage || error.message });
-      logger.error(`Keeper action failed: ${error.shortMessage || error.message}`);
+      const message = safeError(error);
+      await updateAction(db, actionId, "failed", { error: message, nextAttemptAt: new Date(Date.now() + retryDelayMs) });
+      logger.error(`Keeper action failed: ${message}`);
       return false;
     }
   }
@@ -99,10 +111,9 @@ export function createKeeper(config, db, publicClient, logger = console) {
       catch (error) { logger.warn(`pendingFees read failed for ${row.token_address}: ${error.shortMessage || error.message}`); continue; }
       if (pending[0] === 0n && pending[1] === 0n) continue;
       const key = collectActionKey(row.token_address, Date.now(), config.keeper.collectMinAgeMs, mode);
-      const id = await reserveAction(db, runId, { key, type: "collect_fees", subject: lower(row.token_address), details: { pending0: pending[0], pending1: pending[1] } });
+      const id = await reserveAction(db, runId, { key, type: "collect_fees", subject: lower(row.token_address), details: { pending0: pending[0], pending1: pending[1] } }, maxAttempts);
       if (!id) continue;
-      if (config.keeper.dryRun) { await updateAction(db, id, "simulated", { details: { execution: "disabled_by_dry_run" } }); completed += 1; }
-      else if (await submit(id, { address: config.contracts.locker, abi: lockerKeeperAbi, functionName: "collectFees", args: [row.token_address] })) completed += 1;
+      if (await submit(id, { address: config.contracts.locker, abi: lockerKeeperAbi, functionName: "collectFees", args: [row.token_address] })) completed += 1;
     }
     return completed;
   }
@@ -120,15 +131,17 @@ export function createKeeper(config, db, publicClient, logger = console) {
     for (const reward of funded.rows) {
       const rankings = await rankCreators(db, config.chainId, reward.epoch_id, config.keeper.rankingMode);
       const key = `finalize:${mode}:${reward.epoch_id}:${lower(reward.currency)}`;
-      const id = await reserveAction(db, runId, { key, type: "finalize_epoch", subject: `${reward.epoch_id}:${lower(reward.currency)}`, details: { funding: reward.amount, rankingMode: config.keeper.rankingMode } });
+      const id = await reserveAction(db, runId, { key, type: "finalize_epoch", subject: `${reward.epoch_id}:${lower(reward.currency)}`, details: { funding: reward.amount, rankingMode: config.keeper.rankingMode } }, maxAttempts);
       if (!id) continue;
       if (!validateTopFive(rankings)) {
-        await updateAction(db, id, "blocked", { error: `Exactly five distinct creators are required; found ${rankings.length}` });
+        await updateAction(db, id, "blocked", { error: `Exactly five distinct creators are required; found ${rankings.length}`, nextAttemptAt: new Date(Date.now() + retryDelayMs) });
         continue;
       }
       const recipients = rankings.map((row) => lower(row.creator_address));
-      if (config.keeper.dryRun) { await updateAction(db, id, "simulated", { details: { recipients, execution: "disabled_by_dry_run" } }); completed += 1; }
-      else if (await submit(id, { address: config.contracts.rewardVault, abi: rewardKeeperAbi, functionName: "finalizeEpoch", args: [BigInt(reward.epoch_id), reward.currency, recipients] })) completed += 1;
+      const distributor = config.keeper.dryRun
+        ? await publicClient.readContract({ address: config.contracts.rewardVault, abi: rewardKeeperAbi, functionName: "distributor" })
+        : account;
+      if (await submit(id, { address: config.contracts.rewardVault, abi: rewardKeeperAbi, functionName: "finalizeEpoch", args: [BigInt(reward.epoch_id), reward.currency, recipients] }, distributor)) completed += 1;
     }
     return completed;
   }
@@ -143,8 +156,14 @@ export function createKeeper(config, db, publicClient, logger = console) {
         runId = run.rows[0].id;
         const collected = await collectFees(runId);
         const finalized = await finalizeRewards(runId);
-        const details = { collected, finalized };
-        await db.query(`UPDATE keeper_runs SET status='succeeded',completed_at=now(),details=$2::jsonb WHERE id=$1`, [runId, json(details)]);
+        const actionStatus = await db.query(
+          `SELECT status,count(*)::int count FROM keeper_actions WHERE run_id=$1 GROUP BY status`,
+          [runId],
+        );
+        const statuses = Object.fromEntries(actionStatus.rows.map((row) => [row.status, row.count]));
+        const details = { collected, finalized, statuses };
+        const status = statuses.failed || statuses.blocked ? "partial" : "succeeded";
+        await db.query(`UPDATE keeper_runs SET status=$2,completed_at=now(),details=$3::jsonb WHERE id=$1`, [runId, status, json(details)]);
         return details;
       } catch (error) {
         if (runId) await db.query(`UPDATE keeper_runs SET status='failed',completed_at=now(),details=$2::jsonb WHERE id=$1`, [runId, json({ error: error.message })]);
@@ -164,3 +183,4 @@ export function createKeeper(config, db, publicClient, logger = console) {
 
   return { run, runOnce, stop: () => { stopped = true; } };
 }
+

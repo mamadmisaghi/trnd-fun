@@ -2,9 +2,17 @@ name: Indexer full backfill evidence
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "apps/indexer/**"
+      - ".github/workflows/indexer-backfill.yml"
 
 permissions:
   contents: read
+
+concurrency:
+  group: indexer-full-backfill-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backfill:
@@ -30,6 +38,11 @@ jobs:
       START_BLOCK: 114104980
       CONFIRMATIONS: 4
       BLOCK_BATCH_SIZE: 1000
+      RPC_RETRY_COUNT: 5
+      RPC_RETRY_DELAY_MS: 2000
+      RPC_MAX_BACKOFF_MS: 60000
+      BACKFILL_MAX_ATTEMPTS: 20
+      BACKFILL_RETRY_DELAY_MS: 10000
       KEEPER_ENABLED: "false"
       BACKFILL_REPORT_PATH: backfill-report.json
       RECONCILIATION_REPORT_PATH: reconciliation-report.json
@@ -45,6 +58,8 @@ jobs:
       - run: npm run migrate
       - run: npm run backfill
       - run: npm run reconcile
+      - name: Assert reconciliation passed
+        run: node -e "const r=require('./reconciliation-report.json'); if(r.chainId!==46630 || !(r.launches>0) || !r.cursorBlockHash) { console.error(r); process.exit(1) }"
       - uses: actions/upload-artifact@v4
         with:
           name: robinhood-testnet-backfill-evidence
@@ -52,3 +67,4 @@ jobs:
             apps/indexer/backfill-report.json
             apps/indexer/reconciliation-report.json
           if-no-files-found: error
+

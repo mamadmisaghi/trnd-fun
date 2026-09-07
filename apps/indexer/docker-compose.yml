@@ -16,5 +16,29 @@ services:
       timeout: 3s
       retries: 10
 
+  indexer:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      RPC_URL: ${RPC_URL:-https://rpc.testnet.chain.robinhood.com}
+      DATABASE_URL: postgres://viral:viral@postgres:5432/viral_terminal
+      CHAIN_ID: "46630"
+      START_BLOCK: "114104980"
+      CONFIRMATIONS: "4"
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      KEEPER_ENABLED: "false"
+      KEEPER_DRY_RUN: "true"
+    ports:
+      - "8787:8787"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8787/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
 volumes:
   viral_indexer_data:
+

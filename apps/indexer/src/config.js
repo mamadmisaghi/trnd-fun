@@ -23,6 +23,8 @@ export function loadConfig() {
     rpcRetryCount: integer("RPC_RETRY_COUNT", 3),
     rpcRetryDelayMs: integer("RPC_RETRY_DELAY_MS", 500),
     rpcMaxBackoffMs: integer("RPC_MAX_BACKOFF_MS", 60_000),
+    backfillMaxAttempts: integer("BACKFILL_MAX_ATTEMPTS", 20),
+    backfillRetryDelayMs: integer("BACKFILL_RETRY_DELAY_MS", 10_000),
     readinessMaxLagBlocks: BigInt(integer("READINESS_MAX_LAG_BLOCKS", 2_400)),
     apiPort: integer("API_PORT", 8787),
     corsOrigin: process.env.CORS_ORIGIN || "http://localhost:3000",
@@ -35,6 +37,8 @@ export function loadConfig() {
       intervalMs: integer("KEEPER_INTERVAL_MS", 60_000),
       collectMinAgeMs: integer("KEEPER_COLLECT_MIN_AGE_MS", 300_000),
       confirmations: integer("KEEPER_CONFIRMATIONS", 2),
+      maxAttempts: integer("KEEPER_MAX_ATTEMPTS", 5),
+      retryDelayMs: integer("KEEPER_RETRY_DELAY_MS", 60_000),
       rankingMode: process.env.REWARD_RANKING_MODE || "testnet_trade_count_v1",
     },
     contracts: {
@@ -48,3 +52,4 @@ export function loadConfig() {
     },
   };
 }
+
