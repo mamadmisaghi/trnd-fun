@@ -1,0 +1,106 @@
+name: Deploy Robinhood testnet ETH routes
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, '[deploy-testnet-eth-routes]'))
+    runs-on: ubuntu-latest
+    concurrency:
+      group: trnd-robinhood-testnet-eth-routes
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: contracts
+    env:
+      RH_TESTNET_RPC_URL: https://rpc.testnet.chain.robinhood.com
+      RH_TESTNET_DEPLOYER_ADDRESS: "0x66B6c5e00B1242B9681BCB3bC3bCc3C87C138CaE"
+      RH_TESTNET_DEPLOYER_PRIVATE_KEY: ${{ secrets.RH_TESTNET_DEPLOYER_PRIVATE_KEY }}
+      EXPLORER_API_URL: https://explorer.testnet.chain.robinhood.com/api/
+      FACTORY: "0x8D196Fc239AE5C364eF4E8b76A987Acd6065929C"
+      USDG: "0x20A887523fbbF0024eB46ee672DF15A95521E680"
+      RWA_TOKEN: "0xc9f9c86933092bbbfff3ccb4b105a4a94bf3bd4e"
+      ADAPTER_SEED_ETH_WEI: "50000000000000000"
+      ADAPTER_SEED_USDG: "225000000"
+      ADAPTER_SEED_RWA: "1000000000000000000"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.1
+
+      - name: Validate deployment prerequisites
+        run: bash testnet-preflight.sh
+
+      - name: Prevent duplicate route deployment
+        run: |
+          if [[ -f deployments/46630/eth-routes.json ]]; then
+            echo "ETH route deployment is already recorded for chain 46630."
+            exit 1
+          fi
+
+      - name: Build and test
+        run: |
+          forge build
+          forge test --no-match-path "test/fork/*"
+
+      - name: Deploy and verify ETH routes
+        env:
+          PRIVATE_KEY: ${{ secrets.RH_TESTNET_DEPLOYER_PRIVATE_KEY }}
+        run: |
+          if [[ "$PRIVATE_KEY" != 0x* ]]; then
+            PRIVATE_KEY="0x$PRIVATE_KEY"
+            export PRIVATE_KEY
+          fi
+          forge script script/DeployTestnetEthRoutes.s.sol:DeployTestnetEthRoutes \
+            --rpc-url "$RH_TESTNET_RPC_URL" \
+            --broadcast \
+            --verify \
+            --verifier blockscout \
+            --verifier-url "$EXPLORER_API_URL" \
+            -vvvv
+
+      - name: Verify active forwarder and create manifest
+        if: success()
+        run: |
+          mkdir -p deployments/46630
+          WETH=$(jq -r '.transactions[] | select(.contractName == "TestnetWrappedEther" and .transactionType == "CREATE") | .contractAddress' broadcast/DeployTestnetEthRoutes.s.sol/46630/run-latest.json | tail -1)
+          ADAPTER=$(jq -r '.transactions[] | select(.contractName == "TestnetEthQuoteAdapter" and .transactionType == "CREATE") | .contractAddress' broadcast/DeployTestnetEthRoutes.s.sol/46630/run-latest.json | tail -1)
+          ROUTER=$(jq -r '.transactions[] | select(.contractName == "PairPadRouter" and .transactionType == "CREATE") | .contractAddress' broadcast/DeployTestnetEthRoutes.s.sol/46630/run-latest.json | tail -1)
+          ACTIVE=$(cast call --rpc-url "$RH_TESTNET_RPC_URL" "$FACTORY" 'launchForwarder()(address)')
+          test "${ACTIVE,,}" = "${ROUTER,,}"
+          jq -n \
+            --argjson chainId 46630 \
+            --arg deployer "$RH_TESTNET_DEPLOYER_ADDRESS" \
+            --arg wrappedEth "$WETH" \
+            --arg adapter "$ADAPTER" \
+            --arg router "$ROUTER" \
+            --arg factory "$FACTORY" \
+            --arg usdg "$USDG" \
+            --arg rwa "$RWA_TOKEN" \
+            '{chainId:$chainId,network:"Robinhood Chain Testnet",deployer:$deployer,testnetOnly:true,contracts:{wrappedEth:$wrappedEth,ethQuoteAdapter:$adapter,router:$router,factory:$factory},pairs:{USDG:$usdg,TSLA:$rwa},rates:{ETH_USDG:"4500",ETH_TSLA:"18"}}' \
+            > deployments/46630/eth-routes.json
+          jq . deployments/46630/eth-routes.json
+
+      - name: Upload broadcast and deployment manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: robinhood-testnet-eth-routes-${{ github.run_number }}
+          path: |
+            contracts/broadcast/DeployTestnetEthRoutes.s.sol/46630/
+            contracts/deployments/46630/eth-routes.json
+          if-no-files-found: warn
