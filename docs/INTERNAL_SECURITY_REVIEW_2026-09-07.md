@@ -4,7 +4,10 @@ Date: 2026-09-07
 Scope: current V2 launchpad contracts, fee collection and claims, launch
 forwarding, ETH route composition, and the Robinhood Chain testnet adapter.
 
-Deployment tracking: testnet ETH-route deployment and address reconciliation requested after green contract and web CI.
+Deployment tracking: the testnet ETH-route stack was deployed and verified,
+then validated end to end onchain. The versioned manifests are
+`contracts/deployments/46630/eth-routes.json` and
+`contracts/deployments/46630/eth-route-smoke.json`.
 
 ## Result
 
