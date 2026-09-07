@@ -12,6 +12,11 @@ export function createDatabase(connectionString) {
       catch (error) { await client.query("ROLLBACK"); throw error; }
       finally { client.release(); }
     },
+    async withClient(work) {
+      const client = await pool.connect();
+      try { return await work(client); }
+      finally { client.release(); }
+    },
     close: () => pool.end(),
   };
 }
