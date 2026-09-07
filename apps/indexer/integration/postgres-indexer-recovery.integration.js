@@ -154,13 +154,18 @@ const logger = { info() {}, warn() {}, error() {} };
 
 async function snapshot(db) {
   const result = {};
-  for (const table of ["indexer_state", "raw_events", "launches", "trades", "indexed_blocks", "candles", "token_transfers", "holder_balances"]) {
+  for (const table of ["indexer_state", "raw_events", "launches", "trades", "candles", "token_transfers", "holder_balances"]) {
     const rows = await db.query(`SELECT * FROM ${table} ORDER BY 1,2,3`);
     result[table] = rows.rows.map((row) => Object.fromEntries(
       Object.entries(row).filter(([key]) => !["created_at", "updated_at", "applied_at"].includes(key)),
     ));
   }
   return result;
+}
+
+async function checkpointSnapshot(db) {
+  const rows = await db.query("SELECT block_number, block_hash FROM indexed_blocks ORDER BY block_number");
+  return rows.rows;
 }
 
 test("full configured backfill is restart-idempotent and reorg rebuilds deterministically", async () => {
@@ -173,13 +178,19 @@ test("full configured backfill is restart-idempotent and reorg rebuilds determin
     assert.equal(completed.target, 103n);
 
     const beforeRestart = await snapshot(db);
+    const checkpointsBeforeRestart = await checkpointSnapshot(db);
     const restarted = createIndexer(config, db, createEventHub(), logger, { client });
     await restarted.syncOnce();
     assert.deepEqual(await snapshot(db), beforeRestart);
+    assert.deepEqual(await checkpointSnapshot(db), checkpointsBeforeRestart);
 
     client.setFork("bb");
     await restarted.syncOnce();
     rebuilt = await snapshot(db);
+    for (const checkpoint of await checkpointSnapshot(db)) {
+      const canonicalBlock = await client.getBlock({ blockNumber: BigInt(checkpoint.block_number) });
+      assert.equal(checkpoint.block_hash, canonicalBlock.hash);
+    }
     assert.equal(rebuilt.trades.length, 1);
     assert.equal(rebuilt.trades[0].transaction_hash, `0x${(4).toString(16).padStart(64, "0")}`);
     assert.deepEqual(rebuilt.holder_balances.map(({ holder_address, balance }) => [holder_address, balance]), [
