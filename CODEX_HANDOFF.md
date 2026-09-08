@@ -1,18 +1,135 @@
-# TRND.fun — Codex Master Handoff v3
+# TRND.fun — Codex Verified Handoff v4 — 2026-09-08
 
-Prepared: 2026-09-07 UTC  
-Repository: `https://github.com/mamadmisaghi/viral-terminal-protocol`  
+Updated and reverified: 2026-09-08 UTC  
+Repository: `https://github.com/mamadmisaghi/trnd-fun`  
 Canonical development branch: `main`  
-Verified `main` head at this handoff: `9a5c6f6d09c46e8ea41f4771801eddbcc811e838`  
+Verified `main` head at this handoff: `d5a076ad85da13bcdfe3f74a2cb47269bad6e282`  
 Product stage: working Robinhood Chain testnet launchpad with a production-oriented indexer/market/keeper foundation; full validation, Viral Engine, production routing, security hardening, and mainnet release remain.
+
+
+## 0. Current checkpoint — read this before older roadmap sections
+
+### راهنمای شروع برای مالک پروژه
+
+ریپازیتوری فعلی **mamadmisaghi/trnd-fun** است. این فایل هندآف کامل پروژه است؛ نیازی نیست تاریخچهٔ چت را دوباره توضیح بدهید. طراحی تأییدشدهٔ TRND.fun قفل است و دو شاخهٔ بکاپ محفوظ‌اند. کدهای Indexer، چارت زنده و Keeper و چند مرحلهٔ تست تکمیلی وارد main شده‌اند؛ کودکس نباید آن‌ها را از نو بسازد.
+
+اول بخش‌های باقی‌مانده را با کد فعلی تطبیق بدهد، نقص‌های تأییدشده را رفع کند و سپس وارد Routing واقعی و Viral Engine / AI شود. این هندآف فقط مستندات را به‌روز می‌کند؛ Mainnet، پول واقعی یا تغییر UI را مجاز نمی‌کند.
+
+### Freshly verified state
+
+- Current repository: [mamadmisaghi/trnd-fun](https://github.com/mamadmisaghi/trnd-fun).
+- Same repository ID as the former viral-terminal-protocol: 1359007851. This is a rename, not a different project.
+- Verified main: [d5a076ad85da13bcdfe3f74a2cb47269bad6e282](https://github.com/mamadmisaghi/trnd-fun/commit/d5a076ad85da13bcdfe3f74a2cb47269bad6e282).
+- Existing root AGENTS.md and CODEX_HANDOFF.md were merged by PR #9. This update corrects their stale continuation snapshot.
+- No open PRs were found before preparing this documentation update.
+- Both backup branches remain present: exact TRND preview at c2187ff92319caea5a52156885babe020f6abedf; historical Viral UI at 40af48fccbe10837049e88d44020cf05eae216c6.
+- Earlier local WIP/rebuild instructions are obsolete. Continue from fresh origin/main; never overwrite it with an old export.
+- Current source files, PR records and workflow conclusions were read through the connected repository. No local test suites, browser QA, deployments or blockchain transactions were executed during this resumed handoff.
+
+| Landed work | Evidence |
+| --- | --- |
+| Initial indexer/OHLCV/holders/SSE/keeper foundation | [PR #8](https://github.com/mamadmisaghi/trnd-fun/pull/8) |
+| TRND identity, root guardrails and master handoff | [PR #9](https://github.com/mamadmisaghi/trnd-fun/pull/9) |
+| PostgreSQL first-install and pre-ledger migration tests | [PR #10](https://github.com/mamadmisaghi/trnd-fun/pull/10) |
+| Backfill/restart/reorg recovery integration coverage | [PR #11](https://github.com/mamadmisaghi/trnd-fun/pull/11) |
+| Canonical reconciliation and routed end-user attribution | [PR #12](https://github.com/mamadmisaghi/trnd-fun/pull/12) |
+| Confirmed live market state, OHLC/holder wiring, SSE and truthful Token Market states | [PR #13](https://github.com/mamadmisaghi/trnd-fun/pull/13) |
+| Real keeper dry-run simulations, bounded retries, ranking tests, container gates | [PR #14](https://github.com/mamadmisaghi/trnd-fun/pull/14) |
+
+Current-head CI:
+- [Indexer checks — success](https://github.com/mamadmisaghi/trnd-fun/actions/runs/34165550652)
+- [Protocol checks — success](https://github.com/mamadmisaghi/trnd-fun/actions/runs/34165550583)
+- [Web — success](https://github.com/mamadmisaghi/trnd-fun/actions/runs/34165550638)
+
+Indexer workflow includes npm test, dedicated PostgreSQL integration tests, migrations, one-block chain smoke, syntax checks, Docker image build and Compose validation. PR #14 reports 16/16 local unit tests. Earlier contract evidence reports 61 tests. Exact test totals were not independently recounted from CI logs during this handoff.
+
+Important distinction: the workflow definition and merged backfill/reconciliation tooling do not alone prove the separate full-history evidence run completed successfully. Inspect and retain its actual JSON artifacts and run conclusion before marking that gate accepted. A synthetic recovery integration test is not a live soak.
+
+### Remaining source-review findings — do these first
+
+These observations are pinned to d5a076a. They are specific review findings, not an independent contract/security audit. Recheck fresh main before implementing because another session may have advanced it.
+
+1. **Keeper receipt correctness.** In apps/indexer/src/keeper.js, submit records receipt.status in details but unconditionally sets action status to confirmed after waitForTransactionReceipt. Require receipt.status === success; reverted receipts must fail. Reconcile pending/submitted/unknown actions after crash or RPC timeout before retrying. Preserve transaction hashes and distinguish unknown receipt from confirmed failure.
+2. **Zero recipient guard.** validateTopFive validates format and uniqueness but still accepts the all-zero address. Explicitly reject zero and add regression tests; fewer than five eligible creators must remain blocked, never padded with fake recipients.
+3. **Deployment/API boundary.** apps/web/lib/indexer/client.js still hardcodes the legacy testnet API URL. Parameterize the public endpoint and confirm the deployed endpoint actually serves the new PostgreSQL API/candles/holders/SSE. It still posts /v1/ingest: verify actual server compatibility before switching endpoints; use confirmed receipt validation or documented polling, never client-trusted event ingestion.
+4. **Truthfulness outside Token Market.** The same client's indexedMarketToToken still returns a fabricated sparkline, 0.1 change placeholder, holders: 0, and old ViralTerminal fallback name. Inspect Markets/Explore consumers and replace live placeholders with real metrics or unavailable states. Do not undo the real Token Market work in PR #13.
+5. **Keeper production safety.** Raw trade-count ranking now excludes direct creator self-trades and has bounded retries, but remains explicitly testnet-only. Verify a runtime chain/mode guard, crash recovery and economically meaningful collection thresholds before live use. Multisig and production ranking policy are not established by this testnet ranking.
+6. **Full-history evidence and persistent operations.** Retrieve the backfill/reconciliation workflow reports; confirm range, canonical cursor, receipt/holder/fee reconciliation and actual passing output. Establish persistent staging service/DB, backups, monitoring and a soak before claiming always-on operation.
+7. **Live pricing and delivery review.** Confirm quote units, decimals, USD conversion provenance, market cap/FDV/liquidity semantics, stale states, reconnect refetch and reorg invalidation across all consumers. Process-local SSE is single-replica only.
+8. **Documentation drift.** docs/IMPLEMENTATION_STATUS.md still includes earlier 57-test/pre-broadcast statements; treat these as historical until reconciled. README's imported PAR mainnet deployment section describes upstream infrastructure, NOT an approved TRND mainnet deployment.
+
+Read docs/BATCH_A_KEEPER_SAFETY.md for existing real-simulation, advisory-lock, retry, blocked-epoch and ranking work. Do not repeat the obsolete claim that current dry-run never simulates. Do not call the ranking wash-trade/Sybil-proof.
+
+### Correct immediate sequence
+
+- Fetch/inspect current main and map already-completed acceptance items to tests.
+- Fix the receipt and zero-recipient cases, then prove interrupted-action recovery.
+- Verify deployed API/Frontend compatibility, environment separation and truthful live metrics outside Token Market.
+- Retain full-history/reconciliation evidence and demonstrate persistent test deployment.
+- Continue Batch B routing, then C/D/E Viral ingestion, scoring and RWA matching.
+- Keep final security/audit/multisig/mainnet gates mandatory.
+
+### Setup reference, based on current scripts
+
+Use Node.js 22+, PostgreSQL 16, lockfiles, and Foundry matching CI. Current app is Next.js, not the historical Base44 export.
+
+```bash
+git clone --recurse-submodules https://github.com/mamadmisaghi/trnd-fun.git
+cd trnd-fun
+git fetch origin
+git status --short --branch
+git log -5 --oneline origin/main
+git switch -c feat/trnd-continuation origin/main
+git submodule update --init --recursive
+```
+
+With an existing dirty checkout, preserve changes and use an isolated worktree instead of reset/clean. Read AGENTS.md and this handoff first.
+
+From apps/indexer, use a disposable local DB:
+```bash
+npm ci --no-audit --no-fund
+cp .env.example .env
+docker compose up -d postgres
+node --env-file=.env src/migrate.js
+npm test
+```
+
+Set TEST_DATABASE_URL to a disposable PostgreSQL database through your configured environment. Then:
+```bash
+npm run test:postgres
+node --env-file=.env scripts/smoke-chain.js
+node --env-file=.env src/main.js
+```
+
+The scripts do not automatically load .env; use --env-file or explicit service environment injection. Do not print real environment values. Run one-block smoke on a separate disposable DB, because it invokes a selected block ingest; don't use it to move a production cursor. For full replay use npm run backfill, then npm run reconcile with properly injected environment and retain BACKFILL_REPORT_PATH / RECONCILIATION_REPORT_PATH outputs.
+
+Keeper stays KEEPER_ENABLED=false and KEEPER_DRY_RUN=true. No key is required for read-only verification. Example local DB credentials are not production credentials.
+
+From apps/web: npm ci, npm run build; use npm run dev for local viewing. From contracts:
+```bash
+forge build --sizes
+forge test --no-match-path 'test/fork/*'
+```
+
+No broadcast is needed for the first continuation task.
+
+### Access and decision gates
+
+Already settled: TRND.fun brand/TRND token, locked preview, fee splits, top-five payout weights, repeat Signal launches, one pair per launch in V1.
+
+Do not invent or include provider credentials. Bright Data/6551 credentials previously pasted into chat require rotation. Later stages may need chosen staging host, persistent DB/RPC capacity, provider subscriptions, least-privilege testnet Keeper identity, production ranking approval and independent audit/multisig setup.
+
+Report these only when they actually block a next action; do not ask the user to restate project history.
+
+---
 
 ## 1. Start the next Codex session with this
 
 ```text
 Continue the TRND.fun project in this connected GitHub repository:
-https://github.com/mamadmisaghi/viral-terminal-protocol
+https://github.com/mamadmisaghi/trnd-fun
 
-TRND.fun is the final product name and TRND is the platform token. The repository URL still contains the historical ViralTerminal slug; do not interpret that as the current brand.
+TRND.fun is the final product name and TRND is the platform token. The repository has now been renamed to mamadmisaghi/trnd-fun. The historical viral-terminal-protocol URL redirects; use the current URL.
 
 Before editing:
 1. Fetch a clean origin/main and report the actual HEAD, recent commits, open PRs, relevant branches, and working-tree state.
@@ -23,7 +140,7 @@ Before editing:
    - backup/viral-terminal-before-trnd-20260907
 5. Treat the approved TRND.fun design as locked. Do not redesign, restructure pages, rename routes, change the component hierarchy, or replace responsive behavior. Only make minimal changes required for real data, truthful loading/error/empty states, accessibility, or confirmed integration defects.
 6. Continue from main on a new feature branch. Never develop from or merge the exact-preview backup wholesale; it contains an older functional snapshot and a different Sites identity.
-7. First validate and finish Batch A at current main: PostgreSQL indexer, backfill/reorg behavior, real OHLCV and SSE, holder/trade attribution, and dry-run-first keeper. Do not rebuild the already-landed foundation from scratch.
+7. Read the dated checkpoint in section 0, then validate only the remaining gaps. PRs #10–#14 already added PostgreSQL migration/recovery tests, reconciliation, live OHLC/SSE wiring, and real keeper dry-run simulations. Do not rebuild these.
 8. Run real PostgreSQL integration tests, indexer tests, web build, contract tests, and container checks. Validate against confirmed Robinhood testnet history.
 9. Keep keeper execution disabled and dry-run by default. Use only a disposable testnet operational wallet for any approved broadcast.
 10. Before merge or deployment, show changed files, architecture impact, exact tests/results, security implications, remaining blockers, and the proposed PR. No production/mainnet deployment without explicit user approval.
@@ -46,7 +163,7 @@ Begin with an evidence-based status report, then execute the next incomplete Bat
 
 - Final platform name: **TRND.fun**
 - Platform token: **TRND**
-- Old name: ViralTerminal, retained only in historical filenames, paths, commits, and the current GitHub repository slug.
+- Old name: ViralTerminal, retained in historical filenames, paths and commits. Current GitHub slug: trnd-fun.
 - Approved live visual reference: `https://trnd-fun-brand-preview.gofivahootan.chatgpt.site/live`
 - Approved Sites project: `appgprj_6a9eb0fc3f888191b083dc5731f0a862`
 - Exact Sites source commit: `f32e6a7706abb9c74a7ed6e839111ef78abca2b9`
@@ -54,7 +171,7 @@ Begin with an evidence-based status report, then execute the next incomplete Bat
 - Exact GitHub preservation commit: `c2187ff92319caea5a52156885babe020f6abedf`
 - Historical pre-TRND UI branch: `backup/viral-terminal-before-trnd-20260907`
 
-The exact-preview backup was verified file-for-file: all 82 files in its `apps/web` subtree match the approved Sites source. At recovery time, 75 of those 82 files were already byte-identical on `main`. The seven differences were the Sites manifest, two launch/wallet integration surfaces, two protocol integration files, and two SVG assets. Current `main` contains newer functional work; therefore:
+Earlier recovery verified all 82 files in the backup web subtree against the approved Sites source. The 2026-09-07 comparison at main 9a5c6f6 found 75/82 matching blobs. That is historical evidence, not a claim of byte equality with the newer d5a076a frontend, which has since received data integration fixes. The seven differences were the Sites manifest, two launch/wallet integration surfaces, two protocol integration files, and two SVG assets. Current `main` contains newer functional work; therefore:
 
 1. build from `main`;
 2. use the live URL and exact-preview backup as the visual oracle;
@@ -158,10 +275,10 @@ Source-of-truth priority:
 
 Repository facts verified at this handoff:
 
-- `main`: `9a5c6f6d09c46e8ea41f4771801eddbcc811e838`
-- latest main commit: `feat(indexer): add market data API and safe keeper`
+- `main`: `d5a076ad85da13bcdfe3f74a2cb47269bad6e282`
+- latest merged implementation: PR #14, Complete pre-AI Batch A readiness
 - open pull requests: none detected;
-- no workflow runs/statuses were attached to the current head when checked, so the landed Batch A foundation is not considered fully accepted.
+- Current-head Indexer, Protocol and Web workflows all succeeded. Specific remaining integration/security/operations gates still require review; a green workflow does not prove a running production service.
 - relevant branches include `feat/indexer-market-keeper`, `feat/trnd-ui-eth-routes`, operational deployment branches, and the two required backup branches above.
 
 ## 6. Confirmed completed work
@@ -194,7 +311,7 @@ Batch A foundation now on `main` at `9a5c6f6...`:
 - process-local SSE at `/v1/stream`;
 - keeper implementation with disabled/dry-run defaults, advisory locking, idempotent action keys, fee collection, and blocked reward finalization unless five valid creators exist;
 - Dockerfile, migration workflow updates, unit tests, and a read-only live-chain smoke script;
-- frontend indexer client and Token Market integration updates.
+- subsequent PR #13 adds frontend candles/holders/SSE wiring and truthful live Token Market states; see section 0 for remaining shared-client placeholders.
 
 This foundation is implemented, but the full Batch A acceptance criteria below still require evidence. Do not describe it as production-ready.
 
@@ -258,7 +375,7 @@ Canonical manifests:
 
 Do not rebuild the landed indexer from scratch. Inspect current code and close only evidence-backed gaps.
 
-Required validation/completion:
+Acceptance checklist (several items already implemented in PRs #10–#14; map each to current tests/evidence before deciding it is missing):
 
 1. run first-install and upgrade migrations against disposable PostgreSQL, including the pre-ledger upgrade path;
 2. run all PostgreSQL integration tests without skips;
@@ -324,7 +441,7 @@ Batch A acceptance evidence must show:
 - AI only for shortlisted candidates;
 - evaluation dataset and reviewer feedback loop.
 
-Targets: duplicate rate below `1%`, Precision@20 at least `70%`, p95 live-delivery latency below `60 seconds`, top-four pair hit rate at least `80%`, and a seven-day shadow test before public signals.
+Proposed evaluation targets, not measured current performance: duplicate rate below `1%`, Precision@20 at least `70%`, p95 live-delivery latency below `60 seconds`, top-four pair hit rate at least `80%`, and a seven-day shadow test before public signals.
 
 ### Batch E — RWA matching and product integration
 
@@ -391,3 +508,7 @@ TRND.fun is complete only when:
 - the locked TRND.fun UI receives only necessary final functional polish.
 
 Until these gates pass, label the system testnet/beta and never describe it as production-safe.
+
+## Handoff delivery boundary
+
+This update changes documentation only, on a separate review branch. It does not merge application code, alter the locked UI, change deployed contracts, provision infrastructure or authorize mainnet. The scratch environment became unavailable during preparation; the durable GitHub document is the deliverable, not an unverified local download link. Previous unsaved local handoff drafts are superseded by this dated checkpoint.
