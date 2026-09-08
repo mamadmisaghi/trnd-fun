@@ -1,215 +1,248 @@
-# TRND.fun — Codex Master Handoff v3
+# TRND.fun — Developer and Codex Master Handoff v4
 
-Prepared: 2026-09-07 UTC  
-Repository: `https://github.com/mamadmisaghi/viral-terminal-protocol`  
-Canonical development branch: `main`  
-Verified `main` head at this handoff: `9a5c6f6d09c46e8ea41f4771801eddbcc811e838`  
-Product stage: working Robinhood Chain testnet launchpad with a production-oriented indexer/market/keeper foundation; full validation, Viral Engine, production routing, security hardening, and mainnet release remain.
+Prepared: 2026-09-08 UTC
 
-## 1. Start the next Codex session with this
+Canonical repository: `https://github.com/mamadmisaghi/trnd-fun`
+
+Canonical branch: `main`
+
+Verified main commit: `a2e16ddcc9a9b275ef985818200e7bf218d9100d`
+
+Merged milestone: PR #16, Batch B dynamic pair catalog and guarded testnet routes
+Product state: functional Robinhood Chain Testnet prototype; not production-safe and not approved for mainnet or real funds.
+
+This is the authoritative continuation handoff. Repository code, confirmed deployment manifests, onchain state, and green CI override stale prose.
+
+## 1. Copy/paste prompt for the next developer's Codex
 
 ```text
-Continue the TRND.fun project in this connected GitHub repository:
-https://github.com/mamadmisaghi/viral-terminal-protocol
-
-TRND.fun is the final product name and TRND is the platform token. The repository URL still contains the historical ViralTerminal slug; do not interpret that as the current brand.
+Continue TRND.fun from https://github.com/mamadmisaghi/trnd-fun.
 
 Before editing:
-1. Fetch a clean origin/main and report the actual HEAD, recent commits, open PRs, relevant branches, and working-tree state.
-2. Read AGENTS.md and CODEX_HANDOFF.md completely, then inspect the repository documents and deployment manifests listed there.
-3. Compare repository reality with the handoff. Current code and confirmed onchain manifests win over stale prose; report mismatches.
-4. Preserve both backup branches:
-   - backup/trnd-brand-preview-exact-20260907
-   - backup/viral-terminal-before-trnd-20260907
-5. Treat the approved TRND.fun design as locked. Do not redesign, restructure pages, rename routes, change the component hierarchy, or replace responsive behavior. Only make minimal changes required for real data, truthful loading/error/empty states, accessibility, or confirmed integration defects.
-6. Continue from main on a new feature branch. Never develop from or merge the exact-preview backup wholesale; it contains an older functional snapshot and a different Sites identity.
-7. First validate and finish Batch A at current main: PostgreSQL indexer, backfill/reorg behavior, real OHLCV and SSE, holder/trade attribution, and dry-run-first keeper. Do not rebuild the already-landed foundation from scratch.
-8. Run real PostgreSQL integration tests, indexer tests, web build, contract tests, and container checks. Validate against confirmed Robinhood testnet history.
-9. Keep keeper execution disabled and dry-run by default. Use only a disposable testnet operational wallet for any approved broadcast.
-10. Before merge or deployment, show changed files, architecture impact, exact tests/results, security implications, remaining blockers, and the proposed PR. No production/mainnet deployment without explicit user approval.
+1. Fetch origin/main and verify the starting commit is at least a2e16ddcc9a9b275ef985818200e7bf218d9100d.
+2. Read AGENTS.md and CODEX_HANDOFF.md completely.
+3. Inspect docs/IMPLEMENTATION_STATUS.md, docs/BATCH_A_KEEPER_SAFETY.md, docs/BATCH_B_ROUTE_POLICY.md, contracts/deployments/46630/*.json, apps/indexer/README.md, apps/testnet-api/README.md, and apps/web/README.md.
+4. Report any mismatch. Code, manifests, chain state, and reproducible tests win.
+5. Work from current main on a feature branch and use a PR. Do not develop from or merge backup branches.
 
-Hard rules:
-- Never expose, print, log, or commit private keys, RPC secrets, provider tokens, or API credentials.
-- Never place secrets in NEXT_PUBLIC_*.
-- Previously shared Bright Data and 6551 credentials must be treated as exposed and rotated before reuse.
-- Never use the fixed-price TestnetEthQuoteAdapter on mainnet.
-- No mainnet or real-funds enablement without independent audit, multisigs, operational runbooks, and explicit user approval.
+Immediate objective before the Viral/AI Engine:
+- finish the temporary pre-VPS data path so the public preview truthfully shows confirmed testnet data;
+- add D1/API parity for candles, holders, and SSE, or host the PostgreSQL indexer;
+- persist and reconcile the full-history backfill;
+- make Token Market tolerate partial endpoint failure;
+- verify truthful loading, stale, empty, reconnecting, and error states with no silent mock fallback.
+
+Preserve the exact approved TRND.fun UI. The visual source of truth is backup/trnd-brand-preview-exact-20260907 at c2187ff92319caea5a52156885babe020f6abedf. Use it only as a visual oracle. Do not redesign, merge the backup wholesale, or copy its Sites manifest.
+
+Safety rules:
+- Testnet only. No mainnet, production-safety claims, or real funds.
+- Never expose or commit keys, seeds, RPC secrets, provider tokens, or deployment credentials.
+- Previously shared Bright Data and 6551 credentials must be rotated before use.
+- Keep keeper disabled and dry-run by default.
+- Never use TestnetEthQuoteAdapter outside chain 46630.
 - Keep buyback/burn manual and multisig-controlled.
-- Use integer/bigint arithmetic for canonical monetary and chain values.
-- A Signal may produce multiple launches. Do not add one-event-one-launch enforcement or event attestation to contracts.
-- V1 uses exactly one pair per launched token; multi-pair is V2.
+- Use bigint/integer accounting for canonical monetary values.
+- A Signal may produce multiple launches; do not add event attestation or one-event-one-launch enforcement.
+- V1 has exactly one quote pair per launched token; multi-pair is V2.
 
-Begin with an evidence-based status report, then execute the next incomplete Batch A acceptance criteria. Do not stop after planning unless access, infrastructure, or required credentials truly block execution.
+Do not rebuild completed Batch A/B foundations. Start with the temporary data/UI gap in sections 8 and 13, validate it, then proceed to the Viral Engine roadmap.
 ```
 
-## 2. Identity and locked visual source of truth
+## 2. Identity and locked UI
 
-- Final platform name: **TRND.fun**
-- Platform token: **TRND**
-- Old name: ViralTerminal, retained only in historical filenames, paths, commits, and the current GitHub repository slug.
-- Approved live visual reference: `https://trnd-fun-brand-preview.gofivahootan.chatgpt.site/live`
-- Approved Sites project: `appgprj_6a9eb0fc3f888191b083dc5731f0a862`
-- Exact Sites source commit: `f32e6a7706abb9c74a7ed6e839111ef78abca2b9`
-- Exact GitHub preservation branch: `backup/trnd-brand-preview-exact-20260907`
-- Exact GitHub preservation commit: `c2187ff92319caea5a52156885babe020f6abedf`
-- Historical pre-TRND UI branch: `backup/viral-terminal-before-trnd-20260907`
+- Product: **TRND.fun**; platform token: **TRND**.
+- **ViralTerminal** is historical. It remains in internal filenames, package names, components, contracts, and history. Do not restore it in product-facing copy.
+- Public preview: `https://trnd-fun-brand-preview.gofivahootan.chatgpt.site`
+- Frontend Sites project: `appgprj_6a9eb0fc3f888191b083dc5731f0a862`
+- Published frontend version: 3.
+- Published Sites source SHA: `006bafc0183a814b7338c630975703a442b7ec52` (Sites repository, not monorepo SHA).
+- Visual backup: `backup/trnd-brand-preview-exact-20260907` at `c2187ff92319caea5a52156885babe020f6abedf`.
+- Historical UI backup: `backup/viral-terminal-before-trnd-20260907`.
 
-The exact-preview backup was verified file-for-file: all 82 files in its `apps/web` subtree match the approved Sites source. At recovery time, 75 of those 82 files were already byte-identical on `main`. The seven differences were the Sites manifest, two launch/wallet integration surfaces, two protocol integration files, and two SVG assets. Current `main` contains newer functional work; therefore:
+The UI is locked. Preserve routes, hierarchy, responsive behavior, typography, spacing, colors, cards, charts, and interaction model. Only real-data wiring, truthful states, accessibility, and confirmed defects justify changes without explicit redesign approval.
 
-1. build from `main`;
-2. use the live URL and exact-preview backup as the visual oracle;
-3. port only a proven visual difference when required;
-4. never replace `main` with the backup tree;
-5. never copy the backup `.openai/hosting.json` into another deployment target without deliberate verification.
-
-Locked visual direction:
-
-- premium dark terminal surface;
-- neon-green TRND.fun identity;
-- approved typography, density, spacing, cards, status treatments, charts, motion, and responsive behavior;
-- existing routes, page layout, component hierarchy, and interaction model;
-- no restoration of the ViralTerminal wordmark or name.
-
-Allowed UI changes are limited to real-data wiring, accurate pending/confirmed/error/empty/stale states, accessibility, and small integration fixes. Major aesthetic changes require explicit user approval.
+Never merge the visual backup wholesale or copy its `.openai/hosting.json`; it is an older functional snapshot with a different deployment identity.
 
 ## 3. Product definition
 
-TRND.fun is an AI-powered real-time cultural-intelligence and token-launch platform for Robinhood Chain.
+TRND.fun is intended to:
 
-Core loop:
+1. ingest public social/news signals;
+2. detect accelerating attention and authoritative events;
+3. calculate a measurable Viral Score from 0–100;
+4. explain why an event is moving;
+5. recommend exactly four enabled RWA quote assets with independent 0–100 scores;
+6. launch a token against one selected asset;
+7. route ETH into/out of the market through validated paths;
+8. index canonical launches, trades, candles, holders, fees, rewards, and claims.
 
-1. ingest public social and news signals;
-2. detect emerging attention and high-authority events;
-3. compute a measurable Viral Score from 0–100;
-4. explain why the event is moving;
-5. recommend four currently enabled Robinhood RWA pair assets with independent match scores;
-6. let a user launch a token paired with one selected asset;
-7. let users buy and sell through validated ETH-to-pair routing;
-8. index launches, markets, trades, holders, fees, rewards, and claims from canonical chain data.
+The Viral/AI Engine in steps 1–5 is not implemented. Most signal, creator, portfolio, and discovery content remains mock-backed.
 
-Primary surfaces:
-
-- landing and live overview;
-- Analyzer / live Signal feed;
-- Signal detail and intelligence;
-- Markets / Explore;
-- Token Market;
-- Launch Studio and manual Create;
-- Creators and creator profiles;
-- Portfolio;
-- Docs.
-
-Current web routes are under `apps/web/app`: `/`, `/live`, `/signals`, `/signal/[id]`, `/launch/[id]`, `/create`, `/explore`, `/token/[id]`, `/creators`, `/creator/[id]`, `/portfolio`, and `/docs`.
+Routes: `/`, `/live`, `/signals`, `/signal/[id]`, `/launch/[id]`, `/create`, `/explore`, `/token/[id]`, `/token/live?address=...`, `/creators`, `/creator/[id]`, `/portfolio`, `/docs`.
 
 ## 4. Locked protocol and economics
 
-- Production uses independent TRND.fun contracts; it must not depend on the o1 API.
-- Target chain: Robinhood Chain.
-- V1: one quote pair per launched token; multi-pair is V2.
-- A Signal may be launched more than once.
-- No ViralEventRegistry, event attestation, or contract-level one-signal-one-launch restriction.
-- RWA-paired markets remain buyable and sellable using ETH through validated routes.
-- Atomic creator buy is supported.
-- Pools are ordinary Uniswap v4 pools without a custom hook.
-- Launch liquidity is permanently locked.
+- Independent TRND.fun contracts; production must not depend on the historical o1 API.
+- Target: Robinhood Chain; current work is chain `46630` testnet only.
+- One quote pair per launched token in V1; a Signal may launch multiple times.
+- No event attestation or contract-level one-signal-one-launch gate.
+- Atomic creator opening buy; plain Uniswap v4 pools; no custom hook; permanently locked launch liquidity.
+- Launch fee `0.001 ETH`; opening FDV target about `$4,000`; fixed supply `1,000,000,000`.
+- Base fee `1%`; optional creator fee `0–10%` on buys and sells.
+- Creator gets all optional creator fee plus 50% of base-fee share.
+- Base-fee policy: 50% creator escrow, 20% daily creator rewards, 10% operations, 20% TRND buyback treasury.
+- Top-five epoch weights: `40 / 25 / 15 / 12 / 8`; epoch is 24-hour UTC.
+- No automatic burn; buyback/burn stays manual and multisig-controlled.
+- Recommend exactly four enabled pair assets. Scores are independent and need not sum to 100.
+- Persist selected pair, match score, rationale, and model/version once AI exists.
 
-| Parameter | Locked value |
-| --- | --- |
-| Launch fee | `0.001 ETH` |
-| Opening FDV target | approximately `$4,000` |
-| Total supply | `1,000,000,000` tokens |
-| Base trading fee | `1%` on buys and sells |
-| Optional creator fee | shared buy/sell rate, `0–10%` |
-| Creator share of base fee | `50%` |
-| Daily top-creator reward vault | `20%` |
-| Operations/API/team vault | `10%` |
-| TRND buyback vault | `20%` |
-| Top-five epoch weights | `40 / 25 / 15 / 12 / 8` |
-| Reward epoch | 24-hour UTC |
+## 5. Repository map and truth order
 
-The creator receives 100% of the optional creator fee in addition to the 50% base-fee share. Buyback assets accumulate in the buyback vault. V1 has no automatic burn; buyback/burn remains a manual multisig-controlled operation.
+The monorepo has 303 tracked files and about 1.6 MiB packed Git data. It is not too large.
 
-RWA matching rules:
+- `apps/web`: Next.js 15 static UI, wallet/testnet calls, partial indexer integration.
+- `apps/indexer`: full PostgreSQL indexer, read API, SSE, and keeper foundation.
+- `apps/testnet-api`: temporary Cloudflare Sites Worker + D1 pre-VPS API; intentionally smaller and currently incomplete.
+- `contracts`: Solidity, tests, scripts, vendored libraries/submodule, deployment manifests.
+- `deployment-packages/robinhood-testnet-genesis`: immutable integration/deployment handoff.
+- `docs`: protocol, status, security, Batch A/B and release material.
+- `.github/workflows`: CI and guarded testnet operations.
 
-- never hardcode a pair count such as 194 or 196;
-- synchronize the active/enabled PairAsset catalog dynamically;
-- recommend exactly four enabled assets;
-- each score is independently 0–100 and the four scores need not sum to 100;
-- store the selected pair, score, rationale, and model/version at launch time.
+Truth priority: (1) chain state and deployment manifests, (2) current `origin/main`, (3) green reproducible CI, (4) this handoff, (5) old prose/conversations.
 
-## 5. Repository map and source-of-truth order
+Historical `PairPad`, `PAR`, `PONS`, `Viral*`, and `viral-terminal` identifiers come from the licensed baseline. They are not a second active product. Rename only in a dedicated tested migration, not during feature work.
 
-Primary areas:
+## 6. Git/GitHub audit
 
-- `apps/web` — locked TRND.fun Next.js product UI and testnet wallet/protocol integration.
-- `apps/indexer` — PostgreSQL indexer, read API, candles, holders, SSE, and keeper foundation.
-- `apps/testnet-api` — temporary testnet-facing API surface; do not confuse it with the final production architecture.
-- `contracts` — launchpad, routing, fee, reward, registry, tests, scripts, and deployment manifests.
-- `deployment-packages/robinhood-testnet-genesis` — immutable integration handoff for the first confirmed testnet deployment.
-- `docs` — protocol, status, security, and release material; some filenames retain the old Viral naming for history.
+- Canonical main: `a2e16ddcc9a9b275ef985818200e7bf218d9100d`.
+- PR #16 is squash-merged.
+- Stale draft PR #15 (`docs: verified Codex continuation handoff — September 8`) targets pre-Batch-B main. Close it; do not merge it after this v4 is accepted.
 
-Source-of-truth priority:
+Keep:
 
-1. confirmed onchain state and versioned deployment manifests;
-2. current `origin/main` code;
-3. green CI and reproducible test output;
-4. this handoff;
-5. older prose or conversation summaries.
+- `main`
+- `backup/trnd-brand-preview-exact-20260907`
+- `backup/viral-terminal-before-trnd-20260907`
 
-Repository facts verified at this handoff:
+Cleanup candidates after owner/developer confirmation:
 
-- `main`: `9a5c6f6d09c46e8ea41f4771801eddbcc811e838`
-- latest main commit: `feat(indexer): add market data API and safe keeper`
-- open pull requests: none detected;
-- no workflow runs/statuses were attached to the current head when checked, so the landed Batch A foundation is not considered fully accepted.
-- relevant branches include `feat/indexer-market-keeper`, `feat/trnd-ui-eth-routes`, operational deployment branches, and the two required backup branches above.
+- `docs/trnd-fun-handoff-v3`, `docs/trnd-handoff-20260908`
+- `feat/batch-a-backfill-recovery`, `feat/batch-a-live-market-truth`, `feat/batch-a-postgres-acceptance`, `feat/batch-a-reconciliation`
+- `feat/dynamic-pair-routing`, `feat/indexer-market-keeper`, `feat/pre-ai-readiness`, `feat/trnd-ui-eth-routes`
+- `ops/testnet-core-deploy`, `ops/testnet-core-dry-run`, `ops/testnet-eth-route-smoke`, `ops/testnet-eth-routes-deploy`, `ops/testnet-smoke-launch`, `ops/testnet-support-deploy`
 
-## 6. Confirmed completed work
+Most PRs were squash-merged, so `git branch --merged` cannot safely identify them. Compare PRs/manifests before deletion. No branches were deleted during this handoff audit.
 
-Frontend and flows:
+## 7. Completed work
 
-- approved TRND.fun brand/UI is present on `main`;
-- wallet connection and Robinhood testnet network handling;
-- manual Create and Signal Launch paths;
-- atomic Creator Buy;
-- Buy and Sell paths;
-- fee collection and creator claim UI paths;
-- exact approved visual snapshot preserved in GitHub.
+### Contracts/testnet
 
-Contracts/testnet:
+- Pinned the baseline and retained licenses/notices.
+- Added TRND fee splitter, pair registry, reward vault, and operations/buyback treasuries.
+- Wired 50/20/10/20 fee distribution into locked-liquidity collection.
+- Added curated/versioned quote-asset registry and launch gate.
+- Added atomic launch + creator buy, later buys, sell-to-ETH, collection, and claims.
+- Deployed and explorer-verified support, core, and ETH-route testnet stacks.
+- Completed onchain USDG smoke: launch/creator buy, second buy, sell approval, sell, collect, USDG claim, and launch-token claim.
 
-- 61 contract unit/fuzz tests previously passed across 7 suites with zero failures;
-- fee-conservation fuzzing ran 256 cases;
-- testnet contracts were explorer-verified;
-- a real onchain smoke flow succeeded: ETH-funded creator launch/buy, second ETH buy, sell to ETH, collect fees, and claim pair/token fees;
-- internal security review exists at `docs/INTERNAL_SECURITY_REVIEW_2026-09-07.md` and is explicitly not an independent audit.
+### Web
 
-Batch A foundation now on `main` at `9a5c6f6...`:
+- Preserved and published approved TRND.fun UI.
+- Injected-wallet connection and Robinhood testnet switching.
+- Manual Create and Signal Launch paths; atomic creator buy.
+- Market buy/sell/fee collection/claim paths.
+- Dynamic pair catalog in Create and Launch Studio.
+- Fail-closed route lookup; expiry recheck; slippage ceiling; minimum output; fresh simulation; testnet price-impact guard.
+- Partial Token Market indexed-data integration.
+- Mock content intentionally remains where Viral Engine/backend does not exist.
 
-- PostgreSQL migration expansion for enriched market data and keeper state;
-- resumable block processing and reorg-related structures;
-- OHLCV candle derivation for `1m`, `5m`, `15m`, `1h`, and `1d`;
-- holder tracking from ERC-20 transfers;
-- read endpoints for markets, trades, candles, holders, and creator fees;
-- process-local SSE at `/v1/stream`;
-- keeper implementation with disabled/dry-run defaults, advisory locking, idempotent action keys, fee collection, and blocked reward finalization unless five valid creators exist;
-- Dockerfile, migration workflow updates, unit tests, and a read-only live-chain smoke script;
-- frontend indexer client and Token Market integration updates.
+### Batch A — complete PostgreSQL foundation
 
-This foundation is implemented, but the full Batch A acceptance criteria below still require evidence. Do not describe it as production-ready.
+Do not rebuild it. Completed:
 
-## 7. Robinhood Chain testnet reference
+- clean and pre-ledger upgrade migrations;
+- confirmed cursor, bounded ranges, restart idempotency, unique event identity;
+- simulated reorg rewind/rebuild;
+- launches, swaps, routed end-user attribution, transfers, holders, OHLCV, fees, rewards, claims;
+- candles `1m`, `5m`, `15m`, `1h`, `1d`;
+- market/trade/candle/holder/creator-fee APIs;
+- confirmed-only process-local SSE;
+- health/readiness/lag/error state;
+- full Robinhood testnet backfill and reconciliation;
+- dry-run-first keeper with advisory lock, action journal, simulation, idempotency, retries, and safe reward blocking;
+- Docker/compose validation.
 
-- Chain ID: `46630`
-- RPC: `https://rpc.testnet.chain.robinhood.com`
-- Explorer: `https://explorer.testnet.chain.robinhood.com`
+Full-history evidence: 5 pair-asset records, 17 launches, 33 swap/trade records, 88 holder-balance records. These are rows read from existing chain history, not token quantities purchased during CI. GitHub Actions PostgreSQL was ephemeral and was destroyed afterward.
 
-Core deployment:
+### Batch B — completed testnet foundation
 
-| Contract | Address |
+- Confirmed `PairAssetUpdated` ingestion and reorg reconciliation.
+- `/v1/pairs` returns registered/enabled/metadata-valid/allowlisted assets.
+- `/v1/routes/eth/:asset?direction=buy|sell` returns short-lived descriptors.
+- Symbol, decimals, logo key, transfer behavior, testnet restriction, TTL, slippage, impact, and simulation policy.
+- Current public catalog: ETH, faucet USDG, faucet TSLA.
+- Fixed-price adapter is testnet-only.
+- Current router has no onchain deadline; application TTL is not production-grade.
+
+## 8. PostgreSQL versus temporary D1 — critical
+
+### Full PostgreSQL (`apps/indexer`)
+
+Production-oriented implementation. Full tests/backfill/reconciliation/candles/holders/SSE/keeper passed. It is not hosted persistently on a VPS yet.
+
+### Temporary Sites/D1 (`apps/testnet-api`)
+
+- URL: `https://viral-terminal-testnet-api.gofivahootan.chatgpt.site`
+- Sites project: `appgprj_6a9e8085fea88191aa25bf54666faeb1`
+- Published version: 4
+- Sites source SHA: `7b8b00ac99e0ad4b07eb9c220271430c6335ac4d`
+
+Verified live on 2026-09-08:
+
+- `/health`: 200, but cursor/time is stale; no reliable continuous catch-up.
+- `/v1/pairs`: 200; ETH/USDG/TSLA.
+- allowed buy/sell `/v1/routes/eth/:address`: 200.
+- `/v1/markets`: 200; only 2 markets stored.
+- 5 stored trades: 3 `VIRALTEST`, 2 `666/TSLA`.
+- market and trades endpoints: 200.
+- candles: 404; holders: 404; stream: 404.
+
+D1 does not contain the full 17/33/88 PostgreSQL evidence. The chain is canonical; databases are rebuildable derived indexes.
+
+Current UI defect: `TokenMarket.jsx` requests market, trades, candles, and holders in one `Promise.all`. A 404 for candles/holders rejects everything and clears valid market/trade data. Use independent settled requests and per-section states, then add D1 parity or deploy PostgreSQL.
+
+## 9. Test/deployment evidence
+
+PR #16 head: `d899ead3b3c6f1c96fbd0a88ed0e37a0a076e935`.
+
+- Contracts: 7 suites, 61 passed, 0 failed/skipped.
+- Indexer unit: 20 passed, 0 failed.
+- PostgreSQL integration: 7 passed, 0 failed.
+- Migrate, live-chain smoke, JS syntax, Docker build, compose config: passed.
+- Web build: 65 static pages.
+- Testnet API build/artifact/ESM validation: passed.
+- Full backfill and reconcile: passed, artifacts uploaded.
+- Broadcast workflows correctly skipped on PR.
+
+Post-merge:
+
+- UI Sites v3 and API Sites v4 published successfully.
+- `/`, `/create`, `/explore`, `/creators`, and API `/health`: HTTP 200.
+- Published bundle contains `/v1/pairs` and `/v1/routes/eth/` integration.
+- Live pair catalog and TSLA buy/sell route descriptors verified.
+
+Do not rerun full public-RPC backfill on every change. It can take 15+ minutes and is rate-limited. Use focused tests and rerun full evidence only when indexer/reconciliation scope changes; use a dedicated archival provider for continuous operation.
+
+## 10. Robinhood Testnet addresses
+
+- Chain `46630`; RPC `https://rpc.testnet.chain.robinhood.com`; explorer `https://explorer.testnet.chain.robinhood.com`.
+- Start block `114104980`; default confirmations `4`.
+
+| Component | Address |
 | --- | --- |
 | Launch Factory | `0x8D196Fc239AE5C364eF4E8b76A987Acd6065929C` |
 | Original Router | `0x55Bea0D582C48815585164AC476C2C0c71506B5d` |
+| Active ETH-route Router | `0xc3e36d0c7374dee38a092356a59e0829404729e9` |
 | Launch Locker | `0x0CB8026DB8122b2454cd29aF31E1172b3cA39739` |
 | Fee Escrow | `0xCA093138A86Ab9aA4f4aB7bE112F6B0a106c8722` |
 | Reward Vault | `0x426d472CdC78f7741aCbE4864aaf92A015883c9C` |
@@ -221,173 +254,137 @@ Core deployment:
 | Position Minter | `0xc2F71201De7b0d440eb75bBEDd278f88E3fADD7e` |
 | Launch Deployer | `0x62Bf40701f7B8A56deB74224D39A7137eD988Cf3` |
 | Reference Registry | `0x54cFF4Aaf45fB14d40D55BDbD1A341196Ec3C1e8` |
-
-ETH/RWA test route:
-
-| Contract/asset | Address |
-| --- | --- |
-| Active ETH-route Router | `0xc3e36d0c7374dee38a092356a59e0829404729e9` |
-| Testnet ETH Quote Adapter | `0xcc4375d3ff3a8048bdd50c1500593cf395f7ac68` |
+| Testnet ETH Adapter | `0xcc4375d3ff3a8048bdd50c1500593cf395f7ac68` |
 | Test Wrapped ETH | `0x78a01a9b91ad157867ffcaf9b93c38dd83221976` |
 | Faucet USDG | `0x20A887523fbbF0024eB46ee672DF15A95521E680` |
-| Faucet TSLA RWA | `0xc9f9c86933092bbbfff3ccb4b105a4a94bf3bd4e` |
+| Faucet TSLA | `0xc9f9c86933092bbbfff3ccb4b105a4a94bf3bd4e` |
 
-The adapter is centralized, owner-priced, reserve-limited, and testnet-only. Never carry it into mainnet configuration.
+Canonical manifests: `contracts/deployments/46630/core.json`, `support.json`, `smoke.json`, `eth-routes.json`, `eth-route-smoke.json`.
 
-Confirmed smoke market:
+Confirmed routed smoke: token `0x018129F6970cB20877C987d22E4ad7Ef9Ddba791`, pair USDG, pool `0x86ed7d66e7a22caaf660e67a6b21bba19f4ee5b03882717569dde2b6022e2686`. Exact transactions/amounts are in `eth-route-smoke.json`.
 
-- token: `0x018129F6970cB20877C987d22E4ad7Ef9Ddba791`
-- pair: USDG
-- pool ID: `0x86ed7d66e7a22caaf660e67a6b21bba19f4ee5b03882717569dde2b6022e2686`
-- launch + Creator Buy tx: `0xc558c8479fc31ef1e2c76b41c4d2b6fa8a4dd172d2294a3eaaf3b9ea3f7eaaa6`
-- second Buy tx: `0x0f8ac29b31fe43b60acd0b8331265605f64cbc8fff6143b1ae42a3b9eb644be2`
-- Sell approval tx: `0xae8a4dc5c27154d25229b07318927446ea4aca13849355c0296dda845e8bfb99`
-- Sell to ETH tx: `0x53833379d0b0d2a1ba52cd7247105394a58ba7d5d8655c6b73b6704a6c562b59`
-- collect fees tx: `0xb7e78bbc77fc752a28bc900e72b7134bcc2a3a35c7007701f63f2b93acafa5fb`
-- claim USDG tx: `0x0224907b970ee0e5dfed196d6f2c4bb89115070f601e9dc3133a5e7d1c7c02e5`
-- claim launch token tx: `0xbd4d52896c23b4207a660d4cabd220d9ce1d6b71650cbbf0fc122b6eed8dceeb`
+## 11. Local commands
 
-Canonical manifests:
+```bash
+git clone --recurse-submodules https://github.com/mamadmisaghi/trnd-fun.git
+cd trnd-fun
+```
 
-- `contracts/deployments/46630/core.json`
-- `contracts/deployments/46630/support.json`
-- `contracts/deployments/46630/eth-routes.json`
-- `contracts/deployments/46630/eth-route-smoke.json`
+```bash
+cd apps/web
+npm ci
+npm run build
+npm run dev
+```
 
-## 8. Immediate execution priority — validate and finish Batch A
+```bash
+cd apps/indexer
+cp .env.example .env
+docker compose up -d postgres
+npm ci
+npm run migrate
+npm test
+TEST_DATABASE_URL=postgres://viral:viral@localhost:5432/viral_terminal npm run test:postgres
+npm run test:chain
+npm start
+```
 
-Do not rebuild the landed indexer from scratch. Inspect current code and close only evidence-backed gaps.
+Evidence-only full scan when justified: `npm run backfill`, then `npm run reconcile`.
 
-Required validation/completion:
+```bash
+cd contracts
+forge build
+forge test --no-match-path "test/fork/*"
+```
 
-1. run first-install and upgrade migrations against disposable PostgreSQL, including the pre-ledger upgrade path;
-2. run all PostgreSQL integration tests without skips;
-3. backfill existing launches, transfers, swaps, fees, and claims from the correct first deployment block;
-4. prove restart idempotency and uniqueness by `(chain_id, transaction_hash, log_index)`;
-5. simulate a confirmed-block reorg and prove deterministic rewind/rebuild of balances, candles, and stats;
-6. reconcile indexed launches, holders, fees, and claimable values against canonical contract views and manifests;
-7. validate price/volume/candle math against known Swap transactions using bigint/integer arithmetic;
-8. verify routed Recent Trades attributes the end-user wallet for `ZapBuy` and `ZapSell` paths;
-9. verify `/v1/stream` reconnect/backoff and confirmed-only delivery;
-10. ensure live/onchain markets never silently fall back to mock charts, trades, holders, or stats;
-11. add/verify health, readiness, lag, structured logs, bounded retries, and RPC backoff;
-12. run keeper in dry-run only and verify simulations, advisory lock, idempotency, retry journal, thresholds, reconciliation, and blocked epochs;
-13. document residual wash-trading/Sybil risk; `testnet_trade_count_v1` is not a production ranking model;
-14. run contract, indexer, PostgreSQL, web build, and container checks in CI;
-15. deploy only to a separate test environment and soak before proposing production use.
+```bash
+cd apps/testnet-api
+npm run build
+npm run validate
+```
 
-Batch A acceptance evidence must show:
+The API build script needs Bash. On Windows use Git Bash/WSL or reproduce its deterministic `dist` copy before validation.
 
-- no duplicate or lost confirmed events after restart;
-- reorg-safe derived data;
-- enriched historical backfill;
-- real swap-driven OHLCV and chart movement;
-- correct routed wallet attribution;
-- restart/reorg-safe holders;
-- confirmed-only SSE with reconnect behavior;
-- no silent live-to-mock fallback;
-- idempotent, simulated, journaled, reconciled fee collection;
-- reproducible creator ranking and safe blocking with fewer than five eligible creators;
-- PostgreSQL integration tests actually ran;
-- all relevant CI checks are green;
-- locked UI structure remains intact.
+## 12. Security/operational facts
 
-## 9. Roadmap after Batch A
-
-### Batch B — dynamic pair catalog and production routing
-
-- synchronize enabled PairAsset registry dynamically;
-- validate token metadata, logos, decimals, and transfer behavior;
-- canonical ETH ↔ RWA route discovery;
-- server-controlled route allowlist;
-- quote TTL, deadline, minimum output, price impact, and simulation;
-- reject fee-on-transfer, rebasing, or unsupported assets;
-- RPC/provider redundancy and route monitoring;
-- replace the fixed-price testnet adapter for any production configuration.
-
-### Batch C — Viral Engine ingestion
-
-- rotate all previously shared provider credentials before use;
-- server-side X, News, TikTok, Instagram, and YouTube adapters;
-- raw event store and normalized source IDs;
-- exact-post deduplication and metric snapshots;
-- provider health/cost tracking;
-- idempotent queues, retry/backoff, and dead-letter handling.
-
-### Batch D — scoring and AI intelligence
-
-- cheap-to-expensive deterministic screening funnel;
-- velocity, acceleration, engagement anomaly, reach, authority, cross-platform, novelty, and persistence features;
-- measurable Viral Score 0–100;
-- concise “Why this is moving” explanation;
-- narrative/entity extraction and clustering;
-- AI only for shortlisted candidates;
-- evaluation dataset and reviewer feedback loop.
-
-Targets: duplicate rate below `1%`, Precision@20 at least `70%`, p95 live-delivery latency below `60 seconds`, top-four pair hit rate at least `80%`, and a seven-day shadow test before public signals.
-
-### Batch E — RWA matching and product integration
-
-- top-four independent match scores from enabled assets only;
-- rationale and model/version persistence;
-- real ViralEvent API and live Analyzer delivery;
-- Signal → Launch provenance;
-- reviewer/admin controls and false-positive handling;
-- real portfolio and creator analytics from indexed data.
-
-### Batch F — release hardening
-
-- separate deployer, keeper, treasury, and admin roles;
-- multisig ownership, timelocks, and emergency runbook;
-- secrets manager, monitoring, alerts, backups, and recovery drills;
-- multi-wallet, concurrency, failure, and load testing;
-- seven-day testnet soak;
-- independent professional audit and remediation;
-- staging/production separation;
-- controlled low-value mainnet canary only after explicit approval.
-
-## 10. Security and truthfulness rules
-
-- No secrets in Git, chat, logs, client bundles, or `NEXT_PUBLIC_*`.
-- Bright Data and 6551 credentials previously shared in conversation are compromised for operational purposes and must be rotated.
-- Browser input is never authoritative for routes, pair validity, fees, launch status, or confirmations.
-- A launch is not confirmed until the transaction is confirmed and indexed.
-- Use exact integers/bigints for accounting; formatting happens at API/UI boundaries.
-- The public testnet RPC is rate-limited; repeated indexing needs controlled backoff and production-grade provider planning.
-- Process-local SSE is acceptable only for a single-replica test deployment. Multi-replica production needs Redis, PostgreSQL `LISTEN/NOTIFY`, or another event bus.
-- Excluding direct creator self-trades does not make rewards Sybil- or wash-trading-proof.
 - Internal review is not an independent audit.
-- No mainnet deployment, real funds, or production-safety claim before every release gate is met.
+- Testnet owner/treasury roles are not production multisigs.
+- Public RPC is unsuitable for reliable continuous indexing.
+- Fixed-price adapter is centralized, owner-priced, reserve-limited, and testnet-only.
+- Current route deadline is app-side only; price-impact comparison is a testnet guard.
+- Process-local SSE is single-replica only; production needs a shared event bus.
+- `testnet_trade_count_v1` is not Sybil/wash-trading resistant.
+- Keep `KEEPER_ENABLED=false` and `KEEPER_DRY_RUN=true` until deliberately rehearsed.
+- Rotate Bright Data/6551 credentials; never reuse previously shared values.
+- No secrets in Git, logs, chat, browser bundles, or `NEXT_PUBLIC_*`.
+- Buyback/burn stays manual and multisig-controlled.
 
-## 11. Read these first
+## 13. Prioritized remaining work
 
-1. `AGENTS.md`
-2. `CODEX_HANDOFF.md`
-3. `docs/VIRAL_PROTOCOL_SPEC.md` (historical filename; current product is TRND.fun)
-4. `docs/IMPLEMENTATION_STATUS.md`
-5. `docs/INTERNAL_SECURITY_REVIEW_2026-09-07.md`
-6. `docs/SECURITY_AND_RELEASE_PLAN.md`
-7. `contracts/deployments/46630/core.json`
-8. `contracts/deployments/46630/support.json`
-9. `contracts/deployments/46630/eth-routes.json`
-10. `contracts/deployments/46630/eth-route-smoke.json`
-11. `apps/indexer/README.md`
-12. `apps/web/README.md`
-13. `apps/web/lib/protocol/robinhood-testnet.js`
+### P0 — truthful temporary data layer before AI
 
-## 12. Definition of done
+1. Choose completed D1 parity for short preview, or deploy PostgreSQL now for ongoing development.
+2. Backfill the persistent database from block `114104980` and reconcile it.
+3. Implement/host candles, holders, SSE, and continuous confirmed sync.
+4. Keep D1 schema/migrations aligned if retained.
+5. Split Token Market requests and add per-section loading/error/stale states.
+6. Remove live-market placeholders or label unavailable values explicitly.
+7. Verify the 17 launches, 33 trades, and holder data are visible or explain reconciliation differences.
+8. Add browser tests for missing wallet, wrong chain, rejected signature, expiry, failed simulation, and successful launch/trade/index refresh.
 
-TRND.fun is complete only when:
+### P1 — repository hygiene
 
-- real social/news inputs produce evaluated Signals;
-- scores and pair matches are measured rather than decorative;
-- users can launch, buy, and sell through validated routes;
-- every live market, trade, chart, holder, fee, reward, and claim comes from canonical data;
-- the indexer and keeper recover safely from restarts, reorgs, and provider failure;
-- contracts receive independent audit and remediation;
-- production roles are multisig-controlled and operationally separated;
-- monitoring, backups, incident procedures, and testnet soak are complete;
-- a controlled mainnet canary receives explicit approval;
-- the locked TRND.fun UI receives only necessary final functional polish.
+1. Close stale PR #15; do not merge it.
+2. Confirm and delete superseded branches in section 6; retain both backups.
+3. Tag deployed milestones before cleanup.
+4. Move long imported PAR baseline from root README to `docs/UPSTREAM_PAR_BASELINE.md`; keep a concise TRND-first README.
+5. Rewrite generic `apps/testnet-api/README.md` to document the actual API and limitations.
+6. Fix stale docs that list completed pre-broadcast/Batch A work as outstanding.
+7. Defer broad internal renaming until backend/data stability.
 
-Until these gates pass, label the system testnet/beta and never describe it as production-safe.
+### P2 — Viral Engine ingestion
+
+1. Rotate credentials.
+2. Build licensed server-side X/news/TikTok/Instagram/YouTube adapters.
+3. Store raw references, normalized IDs, URLs, accounts, timestamps, metric snapshots.
+4. Exact-post dedupe plus narrative/entity clustering.
+5. Idempotent queues, retry/backoff, dead-letter handling, provider health/rate/cost metrics.
+
+### P3 — scoring and AI
+
+1. Cheap-to-expensive deterministic screening.
+2. Velocity, acceleration, anomaly, reach, authority, cross-platform, novelty, persistence.
+3. Versioned measurable 0–100 Viral Score.
+4. Evidence-linked explanations for shortlisted events.
+5. Evaluation dataset, reviewer UI, reason codes, false-positive labels, version tracking.
+6. Targets: duplicate rate <1%, Precision@20 >=70%, p95 delivery <60s, seven-day shadow test.
+
+### P4 — RWA/product integration
+
+1. Dynamic enabled assets; never hardcode catalog count.
+2. Exactly four independent match scores plus rationale/version.
+3. Persist Signal-to-Launch provenance and selected pair decision.
+4. Replace mock Analyzer/creator/portfolio/discovery data with typed APIs.
+5. Reviewer/admin suppression, override, and audit trail.
+
+### P5 — production/release hardening
+
+1. Replace fixed adapter with audited production liquidity/quotes.
+2. Audited router with onchain deadline/route constraints.
+3. Separate deployer, keeper, treasury, operations, and admin roles.
+4. Multisigs/timelocks; secrets manager; redundancy; monitoring; alerts; backups; recovery/incident runbooks.
+5. Multi-wallet, concurrency, failure, reorg, load, and economic-abuse tests.
+6. Seven-day testnet soak and independent audit/remediation.
+7. Mainnet canary only with explicit owner approval.
+
+## 14. Repository recommendation
+
+**Do not create a new repository.** Current main is coherent and compact, and the repository preserves valuable PR, CI, deployment, license, and security history. A new repository risks missing manifests/submodules and creates competing sources of truth.
+
+The perceived disorder is mainly old branches, stale prose, and historical internal names. Clean these in place. Keep main and both backups; close PR #15; prune superseded branches after confirmation; modernize README/testnet API docs via PRs. Do not delete deployment packages, manifests, security records, license notices, or visual backups.
+
+## 15. Definition of done
+
+TRND.fun is complete only when real permitted sources produce traceable Signals; scores/matches are evaluated and versioned; launch/trading uses audited production routes; all live data is canonical/recoverable; indexer/keeper survive restarts/reorgs/provider failures; roles are separated/multisig-controlled; monitoring/backups/incidents are rehearsed; audit findings are fixed; testnet soaks successfully; and a mainnet canary is explicitly approved.
+
+Until then, call it a testnet/beta prototype.
