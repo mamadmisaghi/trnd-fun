@@ -59,7 +59,7 @@ jobs:
       - run: npm run backfill
       - run: npm run reconcile
       - name: Assert reconciliation passed
-        run: node -e "const r=require('./reconciliation-report.json'); if(r.chainId!==46630 || !(r.launches>0) || !r.cursorBlockHash) { console.error(r); process.exit(1) }"
+        run: node -e "const r=require('./reconciliation-report.json'); if(r.chainId!==46630 || !(r.launches>0) || !(r.pairs?.length>0) || !r.cursorBlockHash) { console.error(r); process.exit(1) }"
       - uses: actions/upload-artifact@v4
         with:
           name: robinhood-testnet-backfill-evidence

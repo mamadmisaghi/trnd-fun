@@ -21,12 +21,13 @@ import Button from "@/components/viral/Button";
 import PairAssetLogo from "@/components/viral/PairAssetLogo";
 import PlatformIcon from "@/components/viral/PlatformIcon";
 import { SectionLabel } from "@/components/viral/ui";
-import { getSignal, pairAssets, pairCatalog } from "@/data";
+import { getSignal, pairAssets } from "@/data";
 import { confirmLaunch, getEventLaunch, releaseEvent, reserveEvent, subscribeLaunchState } from "@/lib/launchState";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import SafeImage from "@/components/ui/safe-image";
-import { explorerUrl, getTestnetPair } from "@/lib/protocol/robinhood-testnet";
+import { explorerUrl } from "@/lib/protocol/robinhood-testnet";
+import { usePairCatalog } from "@/lib/protocol/usePairCatalog";
 import { useViralWallet } from "@/lib/protocol/ViralWalletProvider";
 import { indexTransaction } from "@/lib/indexer/client";
 
@@ -74,6 +75,7 @@ export default function LaunchStudio() {
   const [error, setError] = useState("");
   const [onchainResult, setOnchainResult] = useState(null);
   const wallet = useViralWallet();
+  const activeCatalog = usePairCatalog();
   const walletAddress = wallet.address || "Connect wallet";
 
   useEffect(() => {
@@ -81,6 +83,12 @@ export default function LaunchStudio() {
   }, [taxRecipient, wallet.address]);
 
   useEffect(() => subscribeLaunchState(() => setRuntimeLaunch(getEventLaunch(id))), [id]);
+
+  useEffect(() => {
+    if (activeCatalog.status === "ready" && !activeCatalog.bySymbol.has(selectedPair) && activeCatalog.pairs[0]) {
+      setSelectedPair(activeCatalog.pairs[0].symbol);
+    }
+  }, [activeCatalog.bySymbol, activeCatalog.pairs, activeCatalog.status, selectedPair]);
 
   useEffect(() => {
     if (runtimeLaunch?.status === "RESERVED" && phase === "idle") {
@@ -109,8 +117,8 @@ export default function LaunchStudio() {
 
   const pairResults = useMemo(() => {
     const term = pairQuery.toLowerCase().trim();
-    return pairAssets.filter((asset) => !term || `${asset.symbol} ${asset.name} ${asset.sector}`.toLowerCase().includes(term));
-  }, [pairQuery]);
+    return activeCatalog.pairs.filter((asset) => !term || `${asset.symbol} ${asset.name} ${asset.sector}`.toLowerCase().includes(term));
+  }, [activeCatalog.pairs, pairQuery]);
 
   if (!signal) return <div className="max-w-3xl mx-auto px-4 py-32 text-center"><p className="text-secondarytext">Viral Event not found.</p><Button as={Link} to="/live" variant="outline" className="mt-4">Back to Live</Button></div>;
 
@@ -129,8 +137,8 @@ export default function LaunchStudio() {
       try { await wallet.switchNetwork(); } catch (walletError) { setError(walletError.message); }
       return;
     }
-    if (!getTestnetPair(selectedPair)) {
-      setError(`${selectedPair} is an AI recommendation but is not enabled on this testnet deployment. Choose ETH, USDG, or TSLA to submit onchain.`);
+    if (activeCatalog.status !== "ready" || !activeCatalog.bySymbol.has(selectedPair)) {
+      setError(activeCatalog.status === "error" ? "The verified onchain pair catalog is unavailable. Refresh before launching." : "The verified onchain pair catalog is still loading.");
       return;
     }
     if (buyTax !== sellTax) {
@@ -262,12 +270,12 @@ export default function LaunchStudio() {
             <div className="p-5 sm:p-7 min-h-[510px]">
               {step === 0 && (
                 <div>
-                  <div className="flex items-end justify-between gap-4 mb-5"><div><SectionLabel>AI recommended</SectionLabel><p className="text-sm text-secondarytext mt-1">Four independent relevance scores from the current active catalog.</p></div><div className="text-[10px] text-mutedtext">Catalog snapshot {pairCatalog.lastSynced}</div></div>
+                  <div className="flex items-end justify-between gap-4 mb-5"><div><SectionLabel>AI recommended</SectionLabel><p className="text-sm text-secondarytext mt-1">Four independent relevance scores from the current active catalog.</p></div><div className="text-[10px] text-mutedtext">{activeCatalog.status === "ready" ? `Onchain catalog v${activeCatalog.version}` : activeCatalog.status === "error" ? "Catalog unavailable" : "Syncing catalog…"}</div></div>
                   <div className="grid sm:grid-cols-2 gap-3">
-                    {signal.pairRecommendations.map((pair, index) => <PairCard key={pair.symbol} pair={pair} index={index} best={index === 0} selected={selectedPair === pair.symbol} onClick={() => setSelectedPair(pair.symbol)} />)}
+                    {signal.pairRecommendations.map((pair, index) => <PairCard key={pair.symbol} pair={pair} index={index} best={index === 0} selected={selectedPair === pair.symbol} disabled={!activeCatalog.bySymbol.has(pair.symbol)} onClick={() => setSelectedPair(pair.symbol)} />)}
                   </div>
-                  <button onClick={() => setShowAllPairs(!showAllPairs)} className="w-full mt-4 border border-border h-11 flex items-center justify-between px-4 text-sm text-secondarytext hover:text-foreground hover:border-border-strong"><span>Browse all {pairCatalog.activeCount} active pairs</span><ChevronRight size={15} className={cn("transition-transform", showAllPairs && "rotate-90")} /></button>
-                  {showAllPairs && <div className="mt-3 border border-border"><div className="p-3 border-b border-border"><label className="h-9 border border-border bg-deep flex items-center gap-2 px-3"><Search size={13} className="text-mutedtext" /><input value={pairQuery} onChange={(event) => setPairQuery(event.target.value)} placeholder="Search symbol, asset or sector" className="bg-transparent outline-none text-xs w-full" /></label></div><div className="max-h-64 overflow-y-auto grid sm:grid-cols-2">{pairResults.map((asset) => <button key={asset.symbol} onClick={() => setSelectedPair(asset.symbol)} className={cn("flex items-center gap-2.5 text-left px-3 py-2.5 border-b border-r border-border hover:bg-elevated", selectedPair === asset.symbol && "bg-primary/[0.05] text-primary")}><PairAssetLogo symbol={asset.symbol} size={30} /><span className="min-w-0"><span className="font-mono text-sm font-semibold block">{asset.symbol}</span><span className="text-xs text-mutedtext block truncate">{asset.name}</span></span></button>)}</div></div>}
+                  <button onClick={() => setShowAllPairs(!showAllPairs)} className="w-full mt-4 border border-border h-11 flex items-center justify-between px-4 text-sm text-secondarytext hover:text-foreground hover:border-border-strong"><span>Browse all {activeCatalog.status === "ready" ? activeCatalog.pairs.length : "—"} active pairs</span><ChevronRight size={15} className={cn("transition-transform", showAllPairs && "rotate-90")} /></button>
+                  {showAllPairs && <div className="mt-3 border border-border"><div className="p-3 border-b border-border"><label className="h-9 border border-border bg-deep flex items-center gap-2 px-3"><Search size={13} className="text-mutedtext" /><input value={pairQuery} onChange={(event) => setPairQuery(event.target.value)} placeholder="Search symbol, asset or sector" className="bg-transparent outline-none text-xs w-full" /></label></div><div className="max-h-64 overflow-y-auto grid sm:grid-cols-2">{pairResults.map((asset) => <button key={asset.symbol} onClick={() => setSelectedPair(asset.symbol)} className={cn("flex items-center gap-2.5 text-left px-3 py-2.5 border-b border-r border-border hover:bg-elevated", selectedPair === asset.symbol && "bg-primary/[0.05] text-primary")}><PairAssetLogo symbol={asset.logoKey || asset.symbol} size={30} /><span className="min-w-0"><span className="font-mono text-sm font-semibold block">{asset.symbol}</span><span className="text-xs text-mutedtext block truncate">{asset.name}</span></span></button>)}</div></div>}
                   <div className="mt-5 border border-border bg-deep/60 p-4 flex items-start gap-3"><div className="w-5 h-5 rounded-full border border-secondarytext text-[11px] flex items-center justify-center shrink-0">i</div><div><div className="text-xs font-medium">Next up</div><p className="text-[11px] text-mutedtext mt-1">In Step 02 you’ll configure project links, dev buy, tax configuration, and editable metadata.</p></div></div>
                 </div>
               )}
@@ -309,7 +317,7 @@ export default function LaunchStudio() {
             <div className="flex items-center gap-2 mt-3"><PlatformIcon platform={signal.platform} size={13} /><span className="text-xs text-secondarytext">{signal.creator}</span></div>
             <h2 className="text-sm font-semibold leading-snug mt-2">{signal.title}</h2>
             <div className="grid grid-cols-2 gap-px bg-border border border-border mt-4"><SummaryCell label="Viral score" value={signal.viralScore.toFixed(1)} accent /><SummaryCell label="Velocity" value={`+${signal.velocity}%`} /></div>
-            <div className="mt-4 pt-4 border-t border-border"><SectionLabel>Selected pair</SectionLabel><div className="flex items-center justify-between gap-3 mt-2"><div className="flex items-center gap-2.5 min-w-0"><PairAssetLogo symbol={selectedPair} size={38} className={topMatch === signal.pairRecommendations[0] ? "border-primary/40" : ""} /><div className="min-w-0"><div className="font-mono text-xl font-semibold">{selectedPair}</div><div className="text-xs text-mutedtext truncate">{pairAssets.find((asset) => asset.symbol === selectedPair)?.name}</div></div></div><div className={cn("font-mono-nums font-semibold", topMatch === signal.pairRecommendations[0] ? "text-primary" : "text-foreground")}>{topMatch ? `${topMatch.score}%` : "MANUAL"}</div></div>{topMatch && <div className="mt-3 h-1.5 rounded-full bg-border overflow-hidden"><div className={cn("h-full rounded-full", topMatch === signal.pairRecommendations[0] ? "bg-primary" : "bg-foreground/40")} style={{ width: `${topMatch.score}%` }} /></div>}</div>
+            <div className="mt-4 pt-4 border-t border-border"><SectionLabel>Selected pair</SectionLabel><div className="flex items-center justify-between gap-3 mt-2"><div className="flex items-center gap-2.5 min-w-0"><PairAssetLogo symbol={activeCatalog.bySymbol.get(selectedPair)?.logoKey || selectedPair} size={38} className={topMatch === signal.pairRecommendations[0] ? "border-primary/40" : ""} /><div className="min-w-0"><div className="font-mono text-xl font-semibold">{selectedPair}</div><div className="text-xs text-mutedtext truncate">{activeCatalog.bySymbol.get(selectedPair)?.name || pairAssets.find((asset) => asset.symbol === selectedPair)?.name}</div></div></div><div className={cn("font-mono-nums font-semibold", topMatch === signal.pairRecommendations[0] ? "text-primary" : "text-foreground")}>{topMatch ? `${topMatch.score}%` : "MANUAL"}</div></div>{topMatch && <div className="mt-3 h-1.5 rounded-full bg-border overflow-hidden"><div className={cn("h-full rounded-full", topMatch === signal.pairRecommendations[0] ? "bg-primary" : "bg-foreground/40")} style={{ width: `${topMatch.score}%` }} /></div>}</div>
             <div className="mt-5 flex items-start gap-2 text-[11px] text-mutedtext leading-relaxed"><ShieldCheck size={13} className="text-primary shrink-0" />The client reads live protocol economics, simulates the transaction, and waits for a confirmed Robinhood Testnet receipt.</div>
           </div>
         </aside>
@@ -318,12 +326,12 @@ export default function LaunchStudio() {
   );
 }
 
-function PairCard({ pair, index, best, selected, onClick }) {
+function PairCard({ pair, index, best, selected, disabled, onClick }) {
   return (
-    <button onClick={onClick} className={cn("p-4 border text-left transition-colors", selected ? "border-primary bg-primary/[0.04]" : "border-border hover:border-border-strong")}>
+    <button onClick={onClick} disabled={disabled} className={cn("p-4 border text-left transition-colors disabled:opacity-45 disabled:cursor-not-allowed", selected ? "border-primary bg-primary/[0.04]" : "border-border hover:border-border-strong")}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <PairAssetLogo symbol={pair.symbol} size={42} className={best ? "border-primary/45" : ""} />
+          <PairAssetLogo symbol={pair.logoKey || pair.symbol} size={42} className={best ? "border-primary/45" : ""} />
           <div className="min-w-0">
             <div className="flex items-center gap-2"><span className="font-mono text-lg font-semibold">{pair.symbol}</span>{best && <span className="text-[9px] font-semibold tracking-[0.12em] text-primary">BEST MATCH</span>}</div>
             <div className="text-xs text-secondarytext truncate">{pair.name}</div>
@@ -336,7 +344,7 @@ function PairCard({ pair, index, best, selected, onClick }) {
       </div>
       <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-border"><div className={cn("h-full rounded-full", best ? "bg-primary" : "bg-foreground/35")} style={{ width: `${pair.score}%` }} /></div>
       <p className="text-xs text-mutedtext mt-3 leading-relaxed">{pair.reason}</p>
-      <div className="mt-3 flex items-center justify-between text-[10px] uppercase tracking-[0.11em]"><span className="text-mutedtext">Rank 0{index + 1}</span><span className={selected ? "text-primary" : "text-secondarytext"}>{selected ? "Selected" : "Select pair"}</span></div>
+      <div className="mt-3 flex items-center justify-between text-[10px] uppercase tracking-[0.11em]"><span className="text-mutedtext">Rank 0{index + 1}</span><span className={selected ? "text-primary" : "text-secondarytext"}>{disabled ? "Not enabled" : selected ? "Selected" : "Select pair"}</span></div>
     </button>
   );
 }

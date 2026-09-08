@@ -32,7 +32,7 @@ try {
   const completed = await syncWithResume(indexer);
   const state = await db.query("SELECT cursor_block,cursor_block_hash,updated_at FROM indexer_state WHERE chain_id=$1", [config.chainId]);
   const counts = {};
-  for (const table of ["raw_events", "launches", "trades", "fee_collections", "fee_claims", "token_transfers", "holder_balances", "candles", "reward_funding", "reward_finalizations"]) {
+  for (const table of ["raw_events", "pair_assets", "launches", "trades", "fee_collections", "fee_claims", "token_transfers", "holder_balances", "candles", "reward_funding", "reward_finalizations"]) {
     const result = await db.query(`SELECT count(*)::integer AS count FROM ${table} WHERE chain_id=$1`, [config.chainId]);
     counts[table] = result.rows[0].count;
   }

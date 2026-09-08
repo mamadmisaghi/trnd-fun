@@ -1,10 +1,17 @@
 # TRND.fun implementation status
 
-Updated: 2026-09-07 UTC
+Updated: 2026-09-08 UTC
 
 ## Current release gate
 
-**Testnet integration exists; production/mainnet is not approved.** The core and ETH-route stacks have been deployed and verified on Robinhood Chain testnet, an end-to-end launch/buy/sell/collect/claim smoke flow succeeded, and the first PostgreSQL indexer/market/keeper foundation is on main at commit `9a5c6f6d09c46e8ea41f4771801eddbcc811e838`. Full PostgreSQL/reorg/backfill validation, production routing, Viral Engine, operational hardening, multisigs, and an independent audit remain release gates. See `CODEX_HANDOFF.md` for the current continuation plan and exact approved UI provenance.
+**Testnet integration exists; production/mainnet is not approved.** The core and
+ETH-route stacks are deployed and verified on Robinhood Chain testnet. The
+end-to-end launch/buy/sell/collect/claim flow, PostgreSQL migrations, restart and
+reorg behavior, full confirmed backfill and chain reconciliation have passed.
+Batch B adds a confirmed pair catalog and short-lived server route policy; its
+fixed-price RWA adapter remains testnet-only. Production routing, the Viral
+Engine, operational hardening, multisigs and an independent audit remain release
+gates. See `CODEX_HANDOFF.md` for continuation and exact UI provenance.
 
 ## Completed
 
@@ -37,6 +44,10 @@ Updated: 2026-09-07 UTC
   in `contracts/deployments/46630/smoke.json`.
 - Unit-test status: 57 passed, 0 failed, including a 256-run fee-conservation
   fuzz test and fee-on-transfer rejection coverage.
+- Completed Batch A indexer acceptance: clean/upgrade PostgreSQL migrations,
+  restart/reorg integration tests, full confirmed backfill and reconciliation.
+- Added Batch B's onchain-derived pair catalog, metadata validation, server
+  allowlist and short-lived ETH route descriptors for the testnet UI.
 
 ## Required before testnet broadcast
 

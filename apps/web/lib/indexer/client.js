@@ -21,6 +21,29 @@ export async function getIndexedMarkets(limit = 50) {
   return payload.data || [];
 }
 
+export async function getEnabledPairCatalog() {
+  return indexerFetch("/v1/pairs");
+}
+
+export async function getEthRoute(pairAddress, direction) {
+  if (!["buy", "sell"].includes(direction)) throw new Error("Unsupported route direction.");
+  const payload = await indexerFetch(`/v1/routes/eth/${pairAddress}?direction=${direction}`);
+  const route = payload?.route;
+  const expiry = Date.parse(route?.expiresAt);
+  const slippage = Number(route?.maximumSlippageBps);
+  const priceImpact = Number(route?.maximumPriceImpactBps);
+  if (route?.asset?.toLowerCase() !== String(pairAddress).toLowerCase() || route?.direction !== direction) {
+    throw new Error("The route response does not match the requested asset and direction.");
+  }
+  if (!Number.isInteger(slippage) || slippage < 0 || slippage > 10_000 || !Number.isInteger(priceImpact) || priceImpact < 0 || priceImpact > 10_000) {
+    throw new Error("The route response contains an invalid risk policy.");
+  }
+  if (!route.requiresFreshSimulation || !Number.isFinite(expiry) || expiry <= Date.now() || expiry > Date.now() + 300_000) {
+    throw new Error("The route policy expired before simulation. Refresh and try again.");
+  }
+  return payload;
+}
+
 export async function getIndexedMarket(tokenAddress) {
   const payload = await indexerFetch(`/v1/markets/${tokenAddress}`);
   return payload.data || null;

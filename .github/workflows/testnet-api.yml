@@ -1,0 +1,26 @@
+name: Testnet API
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/testnet-api/**", ".github/workflows/testnet-api.yml"]
+  pull_request:
+    paths: ["apps/testnet-api/**", ".github/workflows/testnet-api.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/testnet-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run build
+      - run: npm run validate
+      - run: node --check worker/index.js

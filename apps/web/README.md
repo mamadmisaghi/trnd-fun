@@ -61,14 +61,24 @@ lib/navigation.jsx         Transitional Next navigation adapter for retained UI 
 
 UI components do not fetch data directly. Replace `data/mock/viral-terminal.js` with server-side repository modules or typed API clients, keeping their exported domain shapes while the backend is being introduced. Replace `lib/launchState.js` with authoritative reservation and launch endpoints before production. API secrets go only in server-side environment variables; `.env.example` intentionally contains names only.
 
-The scanner, market history, portfolio and creator analytics remain mock-backed. Manual Create and Signal Launch now support a real native-ETH testnet launch through the deployed TRND.fun router, including wallet connection, network switching, live launch economics, preflight simulation, optional atomic Creator Buy and receipt confirmation. RWA routes, live trading, pair synchronization and creator fee claims remain separate integration workstreams.
+The scanner, portfolio and creator analytics remain mock-backed. Manual Create
+and Signal Launch use a server-controlled, onchain-verified pair catalog for
+ETH, USDG and TSLA testnet launches. Onchain token pages support live indexed
+market history, buy/sell simulation and execution, fee collection and creator
+fee claims. Execution fails closed if the catalog or a fresh route is
+unavailable. The USDG/TSLA adapter is testnet-only; production routes and the
+Viral Engine remain separate release gates.
 
 ## Robinhood Chain Testnet
 
 - Chain ID: `46630`
 - Launch factory: `0x8D196Fc239AE5C364eF4E8b76A987Acd6065929C`
-- Router: `0x55Bea0D582C48815585164AC476C2C0c71506B5d`
+- Active ETH-route router: `0xc3e36d0c7374dee38a092356a59e0829404729e9`
 - Pair registry: `0x8e84B45d98A2b8233Aa1bA8BB16b6678E1C947aa`
 - Explorer: `https://explorer.testnet.chain.robinhood.com`
 
-The UI never receives or stores a private key. A browser wallet remains the creator and signer. The first live route intentionally enables only the native ETH pair; RWA choices stay in preview until their testnet tokens and reference pools are registered.
+The UI never receives or stores a private key. A browser wallet remains the
+creator and signer. The active testnet catalog is read from the pair registry
+and filtered by the server route policy; it currently includes ETH, test USDG
+and test TSLA. These assets and routes are not approved for mainnet or real
+funds.

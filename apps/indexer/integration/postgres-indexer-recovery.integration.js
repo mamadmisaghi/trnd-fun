@@ -19,6 +19,7 @@ const ESCROW = "0x00000000000000000000000000000000000000f4";
 const SPLITTER = "0x00000000000000000000000000000000000000f5";
 const REWARDS = "0x00000000000000000000000000000000000000f6";
 const POOL_MANAGER = "0x00000000000000000000000000000000000000f7";
+const PAIR_REGISTRY = "0x00000000000000000000000000000000000000f8";
 const TOKEN = "0x1000000000000000000000000000000000000000";
 const PAIR = "0x2000000000000000000000000000000000000000";
 const DEPLOYER = "0x3000000000000000000000000000000000000000";
@@ -89,6 +90,11 @@ function makeFork(label) {
       args: { from: "0x0000000000000000000000000000000000000000", to: DEPLOYER, value: 1_000n },
       address: TOKEN, blockNumber: 100, transaction: 1, logIndex: 1, blockHash: blocks.get(100).hash,
     }),
+    encodedLog({
+      event: eventByName.get("PairAssetUpdated"),
+      args: { asset: PAIR, pairType: 1, enabled: true, decimals: 6, configVersion: 1n },
+      address: PAIR_REGISTRY, blockNumber: 100, transaction: 6, logIndex: 2, blockHash: blocks.get(100).hash,
+    }),
   ];
   const forkEvents = label === "aa" ? [
     encodedLog({
@@ -100,6 +106,11 @@ function makeFork(label) {
       event: swapEvent,
       args: { id: POOL_ID, sender: ROUTER, amount0: 25n, amount1: -20n, sqrtPriceX96: Q96 * 2n, liquidity: 9_900n, tick: 1, fee: 10_000 },
       address: POOL_MANAGER, blockNumber: 103, transaction: 3, logIndex: 0, blockHash: blocks.get(103).hash,
+    }),
+    encodedLog({
+      event: eventByName.get("PairAssetUpdated"),
+      args: { asset: PAIR, pairType: 1, enabled: false, decimals: 6, configVersion: 2n },
+      address: PAIR_REGISTRY, blockNumber: 103, transaction: 7, logIndex: 1, blockHash: blocks.get(103).hash,
     }),
   ] : [
     encodedLog({
@@ -116,6 +127,11 @@ function makeFork(label) {
       event: transferEvent,
       args: { from: DEPLOYER, to: BUYER, value: 100n },
       address: TOKEN, blockNumber: 103, transaction: 5, logIndex: 0, blockHash: blocks.get(103).hash,
+    }),
+    encodedLog({
+      event: eventByName.get("PairAssetUpdated"),
+      args: { asset: PAIR, pairType: 1, enabled: true, decimals: 6, configVersion: 3n },
+      address: PAIR_REGISTRY, blockNumber: 103, transaction: 8, logIndex: 1, blockHash: blocks.get(103).hash,
     }),
   ];
   return { blocks, events: [...base, ...forkEvents] };
@@ -153,13 +169,13 @@ const config = {
   batchSize: 2n,
   pollMs: 1,
   reorgRewind: 2n,
-  contracts: { factory: FACTORY, router: ROUTER, locker: LOCKER, feeEscrow: ESCROW, feeSplitter: SPLITTER, rewardVault: REWARDS, poolManager: POOL_MANAGER },
+  contracts: { factory: FACTORY, router: ROUTER, locker: LOCKER, feeEscrow: ESCROW, feeSplitter: SPLITTER, rewardVault: REWARDS, pairRegistry: PAIR_REGISTRY, poolManager: POOL_MANAGER },
 };
 const logger = { info() {}, warn() {}, error() {} };
 
 async function snapshot(db) {
   const result = {};
-  for (const table of ["indexer_state", "raw_events", "launches", "trades", "candles", "token_transfers", "holder_balances"]) {
+  for (const table of ["indexer_state", "raw_events", "launches", "pair_assets", "trades", "candles", "token_transfers", "holder_balances"]) {
     const rows = await db.query(`SELECT * FROM ${table} ORDER BY 1,2,3`);
     result[table] = rows.rows.map((row) => Object.fromEntries(
       Object.entries(row).filter(([key]) => !["created_at", "updated_at", "applied_at"].includes(key)),
@@ -199,6 +215,8 @@ test("full configured backfill is restart-idempotent and reorg rebuilds determin
     assert.equal(rebuilt.trades.length, 1);
     assert.equal(rebuilt.trades[0].transaction_hash, `0x${(4).toString(16).padStart(64, "0")}`);
     assert.equal(rebuilt.trades[0].sender, BUYER.toLowerCase());
+    assert.equal(rebuilt.pair_assets[0].enabled, true);
+    assert.equal(rebuilt.pair_assets[0].config_version, "3");
     assert.deepEqual(rebuilt.holder_balances.map(({ holder_address, balance }) => [holder_address, balance]), [
       [DEPLOYER.toLowerCase(), "900"],
       [BUYER.toLowerCase(), "100"],
