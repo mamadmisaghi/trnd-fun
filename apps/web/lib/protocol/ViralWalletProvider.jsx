@@ -18,8 +18,6 @@ import {
 import {
   erc20Abi,
   feeEscrowAbi,
-  getTestnetEthLeg,
-  getTestnetPair,
   launchFactoryAbi,
   launchLockerAbi,
   nativePairAddress,
@@ -27,6 +25,7 @@ import {
   robinhoodTestnet,
   routerAbi,
 } from "@/lib/protocol/robinhood-testnet";
+import { getEnabledPairCatalog, getEthRoute } from "@/lib/indexer/client";
 
 const WalletContext = createContext(null);
 const WALLET_CHANGED = "viralterminal:wallet-changed";
@@ -47,7 +46,44 @@ function humanizeError(error) {
   return message.replace(/^ContractFunctionExecutionError:\s*/i, "");
 }
 
-const emptyEthLeg = { v3Path: "0x", v4Hops: [] };
+async function enabledPair(symbol) {
+  const catalog = await getEnabledPairCatalog();
+  const pair = (catalog.data || []).find((entry) => entry.enabled && entry.symbol === String(symbol || "").toUpperCase());
+  if (!pair) throw new Error(`${symbol} is not enabled by the current onchain pair catalog and server route policy.`);
+  return pair;
+}
+
+async function freshEthLeg(pairAddress, direction, requestedSlippageBps = 100) {
+  const payload = await getEthRoute(pairAddress, direction);
+  if (requestedSlippageBps > Number(payload.route.maximumSlippageBps)) {
+    throw new Error(`Slippage exceeds the server policy limit of ${payload.route.maximumSlippageBps / 100}%.`);
+  }
+  return payload.route;
+}
+
+function assertFreshRoute(route) {
+  if (!route?.requiresFreshSimulation || !route.expiresAt || Date.parse(route.expiresAt) <= Date.now()) {
+    throw new Error("The server route expired. Refresh the quote and try again.");
+  }
+}
+
+function priceImpactBps(input, output, referenceInput, referenceOutput) {
+  if (input <= 0n || output <= 0n || referenceInput <= 0n || referenceOutput <= 0n) return 10_000;
+  const expectedScaled = referenceOutput * input;
+  const actualScaled = output * referenceInput;
+  if (actualScaled >= expectedScaled) return 0;
+  return Number(((expectedScaled - actualScaled) * 10_000n) / expectedScaled);
+}
+
+async function enforcePriceImpact({ route, input, output, simulateReference }) {
+  const referenceInput = input > 100n ? input / 100n : input;
+  const referenceOutput = referenceInput === input ? output : await simulateReference(referenceInput);
+  const impactBps = priceImpactBps(input, output, referenceInput, referenceOutput);
+  if (impactBps > Number(route.maximumPriceImpactBps)) {
+    throw new Error(`Estimated price impact of ${(impactBps / 100).toFixed(2)}% exceeds the server policy limit of ${route.maximumPriceImpactBps / 100}%.`);
+  }
+  return impactBps;
+}
 
 function createLaunchParams({ account, name, symbol, logo, description, website, twitter, telegram, creatorFeeRecipient, creatorFeePercent, expectedEconomics }) {
   const recipient = isAddress(creatorFeeRecipient || "") ? creatorFeeRecipient : account;
@@ -198,16 +234,17 @@ export function ViralWalletProvider({ children }) {
       functionName: "previewLaunchEconomics",
       args: [0n, nativePairAddress],
     });
+    const route = await freshEthLeg(nativePairAddress, "buy");
     const buyValue = parseEther(String(openingBuyEth || "0"));
     const args = [
       createLaunchParams({ account, name, symbol, logo, description, website, twitter, telegram, creatorFeeRecipient, creatorFeePercent, expectedEconomics }),
       0n,
       nativePairAddress,
-      { v3Path: "0x", v4Hops: [] },
+      route.leg,
       0n,
     ];
     const walletClient = createWalletClient({ account, chain: robinhoodTestnet, transport: custom(provider) });
-    await providerClient.simulateContract({
+    const preview = await providerClient.simulateContract({
       account,
       address: protocolContracts.router,
       abi: routerAbi,
@@ -215,6 +252,18 @@ export function ViralWalletProvider({ children }) {
       args,
       value: launchFee + buyValue,
     });
+    if (buyValue > 0n) {
+      const quotedOut = preview.result[2];
+      await enforcePriceImpact({
+        route,
+        input: buyValue,
+        output: quotedOut,
+        simulateReference: async (referenceValue) => (await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "launchAndBuyWithEth", args, value: launchFee + referenceValue })).result[2],
+      });
+      args[4] = slippageFloor(quotedOut);
+      await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "launchAndBuyWithEth", args, value: launchFee + buyValue });
+    }
+    assertFreshRoute(route);
     const hash = await walletClient.writeContract({
       address: protocolContracts.router,
       abi: routerAbi,
@@ -230,8 +279,7 @@ export function ViralWalletProvider({ children }) {
   }, [address, chainId, connect, refresh, switchNetwork]);
 
   const launchWithPair = useCallback(async ({ pairSymbol = "ETH", openingBuyAmount = "0", openingBuyEth, ...launch }) => {
-    const pair = getTestnetPair(pairSymbol);
-    if (!pair) throw new Error(`${pairSymbol} is not enabled in the current testnet catalog. Choose ETH, USDG, or TSLA.`);
+    const pair = await enabledPair(pairSymbol);
     if (pair.type === "NATIVE") return launchWithEth({ ...launch, openingBuyEth: openingBuyEth ?? openingBuyAmount });
 
     const provider = getProvider();
@@ -246,14 +294,27 @@ export function ViralWalletProvider({ children }) {
       providerClient.readContract({ address: protocolContracts.launchFactory, abi: launchFactoryAbi, functionName: "previewLaunchEconomics", args: [0n, pair.address] }),
     ]);
     const openingBuy = parseEther(String(openingBuyEth ?? openingBuyAmount ?? "0"));
+    const route = await freshEthLeg(pair.address, "buy");
     const args = [
       createLaunchParams({ account, ...launch, expectedEconomics }),
       0n,
       pair.address,
-      getTestnetEthLeg(pair, "buy"),
+      route.leg,
       0n,
     ];
-    await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "launchAndBuyWithEth", args, value: launchFee + openingBuy });
+    const preview = await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "launchAndBuyWithEth", args, value: launchFee + openingBuy });
+    if (openingBuy > 0n) {
+      const quotedOut = preview.result[2];
+      await enforcePriceImpact({
+        route,
+        input: openingBuy,
+        output: quotedOut,
+        simulateReference: async (referenceValue) => (await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "launchAndBuyWithEth", args, value: launchFee + referenceValue })).result[2],
+      });
+      args[4] = slippageFloor(quotedOut);
+      await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "launchAndBuyWithEth", args, value: launchFee + openingBuy });
+    }
+    assertFreshRoute(route);
     const hash = await walletClient.writeContract({ address: protocolContracts.router, abi: routerAbi, functionName: "launchAndBuyWithEth", args, value: launchFee + openingBuy });
     const receipt = await providerClient.waitForTransactionReceipt({ hash, confirmations: 1 });
     if (receipt.status !== "success") throw new Error("The transaction reverted on Robinhood Chain Testnet.");
@@ -339,12 +400,13 @@ export function ViralWalletProvider({ children }) {
     if (!amount || Number(amount) <= 0) throw new Error("Enter an amount greater than zero.");
     if (side === "buy") {
       const value = parseEther(String(amount));
+      const route = await freshEthLeg(market.pairAddress, "buy");
       const simulation = await providerClient.simulateContract({
         account,
         address: protocolContracts.router,
         abi: routerAbi,
         functionName: "buyWithEth",
-        args: [market.poolKey, market.pairIsNative ? emptyEthLeg : getTestnetEthLeg({ address: market.pairAddress }, "buy"), 0n, account],
+        args: [market.poolKey, route.leg, 0n, account],
         value,
       });
       return { raw: simulation.result, formatted: formatUnits(simulation.result, market.decimals), decimals: market.decimals };
@@ -353,12 +415,13 @@ export function ViralWalletProvider({ children }) {
     const allowance = await providerClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: "allowance", args: [account, protocolContracts.router] });
     if (allowance < tokensIn) return { raw: null, formatted: null, decimals: 18, approvalRequired: true };
     const tokenIsCurrency0 = market.poolKey.currency0.toLowerCase() === tokenAddress.toLowerCase();
+    const route = await freshEthLeg(market.pairAddress, "sell");
     const simulation = await providerClient.simulateContract({
       account,
       address: protocolContracts.router,
       abi: routerAbi,
       functionName: "sellToEth",
-      args: [market.poolKey, tokenIsCurrency0, tokensIn, market.pairIsNative ? emptyEthLeg : getTestnetEthLeg({ address: market.pairAddress }, "sell"), 0n, account],
+      args: [market.poolKey, tokenIsCurrency0, tokensIn, route.leg, 0n, account],
     });
     return { raw: simulation.result, formatted: formatEther(simulation.result), decimals: 18, approvalRequired: false };
   }, [getConnectedClients, readMarket]);
@@ -372,11 +435,20 @@ export function ViralWalletProvider({ children }) {
     let args;
     let value;
     let quotedOut;
+    let activeRoute;
     if (side === "buy") {
       value = parseEther(String(amount));
-      const leg = market.pairIsNative ? emptyEthLeg : getTestnetEthLeg({ address: market.pairAddress }, "buy");
+      const route = await freshEthLeg(market.pairAddress, "buy", slippageBps);
+      activeRoute = route;
+      const leg = route.leg;
       const preview = await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "buyWithEth", args: [market.poolKey, leg, 0n, account], value });
       quotedOut = preview.result;
+      await enforcePriceImpact({
+        route,
+        input: value,
+        output: quotedOut,
+        simulateReference: async (referenceValue) => (await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "buyWithEth", args: [market.poolKey, leg, 0n, account], value: referenceValue })).result,
+      });
       functionName = "buyWithEth";
       args = [market.poolKey, leg, slippageFloor(quotedOut, slippageBps), account];
     } else {
@@ -391,14 +463,23 @@ export function ViralWalletProvider({ children }) {
       }
       onStage?.("quoting");
       const tokenIsCurrency0 = market.poolKey.currency0.toLowerCase() === tokenAddress.toLowerCase();
-      const leg = market.pairIsNative ? emptyEthLeg : getTestnetEthLeg({ address: market.pairAddress }, "sell");
+      const route = await freshEthLeg(market.pairAddress, "sell", slippageBps);
+      activeRoute = route;
+      const leg = route.leg;
       const preview = await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "sellToEth", args: [market.poolKey, tokenIsCurrency0, tokensIn, leg, 0n, account] });
       quotedOut = preview.result;
+      await enforcePriceImpact({
+        route,
+        input: tokensIn,
+        output: quotedOut,
+        simulateReference: async (referenceTokens) => (await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName: "sellToEth", args: [market.poolKey, tokenIsCurrency0, referenceTokens, leg, 0n, account] })).result,
+      });
       functionName = "sellToEth";
       args = [market.poolKey, tokenIsCurrency0, tokensIn, leg, slippageFloor(quotedOut, slippageBps), account];
     }
     onStage?.("signature");
     await providerClient.simulateContract({ account, address: protocolContracts.router, abi: routerAbi, functionName, args, ...(value ? { value } : {}) });
+    assertFreshRoute(activeRoute);
     const hash = await walletClient.writeContract({ address: protocolContracts.router, abi: routerAbi, functionName, args, ...(value ? { value } : {}) });
     onStage?.("confirming");
     const receipt = await providerClient.waitForTransactionReceipt({ hash, confirmations: 1 });

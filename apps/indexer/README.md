@@ -25,6 +25,8 @@ mismatch. Inserts are idempotent by `(chain_id, transaction_hash, log_index)`.
 - `GET /health`
 - `GET /ready` (confirmed cursor, chain head, lag and runtime failure state)
 - `GET /v1/markets?limit=50`
+- `GET /v1/pairs`
+- `GET /v1/routes/eth/:asset?direction=buy|sell`
 - `GET /v1/markets/:token`
 - `GET /v1/markets/:token/trades?limit=100`
 - `GET /v1/markets/:token/candles?interval=5m&limit=120`
@@ -34,6 +36,13 @@ mismatch. Inserts are idempotent by `(chain_id, transaction_hash, log_index)`.
 
 Supported candle intervals are `1m`, `5m`, `15m`, `1h` and `1d`. Raw amounts
 remain base-unit decimal strings; prices are quote tokens per launch token.
+
+The pair catalog is the intersection of confirmed `ViralPairRegistry` state,
+validated token metadata and `ROUTE_ALLOWLIST_JSON`. Route responses are
+short-lived, server-controlled execution descriptors. The checked-in defaults
+are restricted to chain `46630`; the fixed-price adapter must never be used in
+production. See `docs/BATCH_B_ROUTE_POLICY.md` for the safety model and
+remaining production gates.
 
 ## Keeper safety
 

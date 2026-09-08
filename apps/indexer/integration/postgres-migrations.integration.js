@@ -9,7 +9,7 @@ if (!connectionString) {
   throw new Error("TEST_DATABASE_URL is required for PostgreSQL integration tests");
 }
 
-const migrations = ["001_initial.sql", "002_market_data_and_keeper.sql"];
+const migrations = ["001_initial.sql", "002_market_data_and_keeper.sql", "003_pair_catalog_and_routes.sql"];
 const expectedTables = [
   "candles",
   "creator_epoch_rankings",
@@ -21,6 +21,7 @@ const expectedTables = [
   "keeper_actions",
   "keeper_runs",
   "launches",
+  "pair_assets",
   "raw_events",
   "reward_finalizations",
   "reward_funding",
@@ -35,6 +36,7 @@ const expectedIndexes = [
   "keeper_actions_retry_idx",
   "launches_creator_idx",
   "launches_order_idx",
+  "pair_assets_enabled_idx",
   "positive_holders_idx",
   "raw_events_block_idx",
   "reward_funding_epoch_idx",
@@ -92,6 +94,7 @@ test("fresh install creates the complete schema and reruns idempotently", async 
       "launches.block_time",
       "launches.pair_decimals",
       "launches.pair_symbol",
+      "pair_assets.metadata_valid",
       "trades.block_time",
       "trades.price_quote_per_token",
       "trades.quote_volume",
@@ -156,7 +159,7 @@ test("pre-ledger schema upgrades without losing indexed data", async () => {
     );
 
     const upgrade = await runMigrations(db, { logger: { log() {} } });
-    assert.deepEqual(upgrade.appliedNames, ["002_market_data_and_keeper.sql"]);
+    assert.deepEqual(upgrade.appliedNames, ["002_market_data_and_keeper.sql", "003_pair_catalog_and_routes.sql"]);
     assert.deepEqual(await migrationNames(db), migrations);
 
     const launch = await db.query("SELECT token_address, pair_symbol, block_time FROM launches");

@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "@/lib/navigation";
 import {
   AlertTriangle,
@@ -41,9 +41,10 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { Switch } from "@/components/ui/switch";
-import { creatorProgram, getCreator, pairAssets, pairCatalog } from "@/data";
+import { creatorProgram, getCreator, pairAssets } from "@/data";
 import { cn } from "@/lib/utils";
-import { explorerUrl, getTestnetPair } from "@/lib/protocol/robinhood-testnet";
+import { explorerUrl } from "@/lib/protocol/robinhood-testnet";
+import { usePairCatalog } from "@/lib/protocol/usePairCatalog";
 import { shortAddress, useViralWallet } from "@/lib/protocol/ViralWalletProvider";
 import { confirmManualLaunch } from "@/lib/launchState";
 import { indexTransaction } from "@/lib/indexer/client";
@@ -89,12 +90,16 @@ export default function Create() {
   const [launchResult, setLaunchResult] = useState(null);
   const [addressSeed, setAddressSeed] = useState(1);
   const wallet = useViralWallet();
+  const activeCatalog = usePairCatalog();
   const walletConnected = wallet.isConnected;
 
   const selectedPair = useMemo(
-    () => pairAssets.find((asset) => asset.symbol === pair) ?? pairAssets[0],
-    [pair],
+    () => activeCatalog.bySymbol.get(pair) || pairAssets.find((asset) => asset.symbol === pair) || activeCatalog.pairs[0] || pairAssets[0],
+    [activeCatalog.bySymbol, activeCatalog.pairs, pair],
   );
+  useEffect(() => {
+    if (activeCatalog.status === "ready" && !activeCatalog.bySymbol.has(pair) && activeCatalog.pairs[0]) setPair(activeCatalog.pairs[0].symbol);
+  }, [activeCatalog.bySymbol, activeCatalog.pairs, activeCatalog.status, pair]);
   const identityComplete = Boolean(name.trim() && ticker.trim() && selectedPair);
   const tokenLetter = (ticker || name || "V").trim().charAt(0).toUpperCase();
   const previewAddress = `0x${(71 + addressSeed).toString(16)}a4…${ticker ? ticker.slice(0, 2).toLowerCase() : "vt"}01`;
@@ -117,8 +122,8 @@ export default function Create() {
       try { await wallet.switchNetwork(); } catch (error) { setLaunchError(error.message); }
       return;
     }
-    if (!getTestnetPair(selectedPair.symbol)) {
-      setLaunchError(`${selectedPair.symbol} is available in the product catalog but not enabled on this testnet deployment. Choose ETH, USDG, or TSLA.`);
+    if (activeCatalog.status !== "ready" || !activeCatalog.bySymbol.has(selectedPair.symbol)) {
+      setLaunchError(activeCatalog.status === "error" ? "The verified onchain pair catalog is unavailable. Refresh before launching." : "The verified onchain pair catalog is still loading.");
       return;
     }
     if (creatorFeeEnabled && creatorBuyFee !== creatorSellFee) {
@@ -209,7 +214,7 @@ export default function Create() {
         <div className="flex items-center gap-3 text-xs text-mutedtext">
           <Database size={14} className="text-primary" />
           <span>Protocol pair catalog</span>
-          <span className="font-mono-nums text-foreground">{pairCatalog.lastSynced}</span>
+          <span className="font-mono-nums text-foreground">{activeCatalog.status === "ready" ? `v${activeCatalog.version}` : activeCatalog.status === "error" ? "Unavailable" : "Syncing…"}</span>
         </div>
       </header>
 
@@ -268,7 +273,7 @@ export default function Create() {
                 onClick={() => setPairOpen(true)}
                 className="w-full h-14 px-4 border border-border-strong bg-card rounded-md flex items-center gap-3 text-left hover:border-primary/55 transition-colors"
               >
-                <PairAssetLogo symbol={selectedPair.symbol} size={34} className="border-primary/25" />
+                <PairAssetLogo symbol={selectedPair.logoKey || selectedPair.symbol} size={34} className="border-primary/25" />
                 <div className="flex-1 min-w-0">
                   <div className="font-mono text-sm font-semibold">{selectedPair.symbol}</div>
                   <div className="text-xs text-mutedtext truncate">{selectedPair.name} · {selectedPair.sector}</div>
@@ -425,7 +430,7 @@ export default function Create() {
               </div>
 
               <div className="flex items-center gap-2 mt-6">
-                <PairAssetLogo symbol={selectedPair.symbol} size={34} className="border-primary/25" />
+                <PairAssetLogo symbol={selectedPair.logoKey || selectedPair.symbol} size={34} className="border-primary/25" />
                 <span className="text-xs font-mono">{selectedPair.symbol}</span>
                 <span className="ml-auto text-[10px] tracking-[0.1em] text-primary">IMMUTABLE SUPPLY</span>
               </div>
@@ -476,7 +481,7 @@ export default function Create() {
         </aside>
       </div>
 
-      <PairDialog open={pairOpen} onOpenChange={setPairOpen} selected={pair} onSelect={setPair} />
+      <PairDialog open={pairOpen} onOpenChange={setPairOpen} selected={pair} onSelect={setPair} assets={activeCatalog.pairs} status={activeCatalog.status} version={activeCatalog.version} />
     </div>
   );
 }
@@ -544,7 +549,7 @@ function LinkInput({ icon: Icon, value, onChange, placeholder, label }) {
   );
 }
 
-function PairDialog({ open, onOpenChange, selected, onSelect }) {
+function PairDialog({ open, onOpenChange, selected, onSelect, assets, status, version }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl border-border-strong bg-card p-0 overflow-hidden">
@@ -557,20 +562,20 @@ function PairDialog({ open, onOpenChange, selected, onSelect }) {
           <CommandList className="max-h-[420px] p-2">
             <CommandEmpty>No active pair found.</CommandEmpty>
             {pairGroups.map((group, groupIndex) => {
-              const assets = pairAssets.filter(group.test);
-              if (!assets.length) return null;
+              const groupedAssets = assets.filter(group.test);
+              if (!groupedAssets.length) return null;
               return (
                 <React.Fragment key={group.label}>
                   {groupIndex > 0 && <CommandSeparator className="my-2" />}
-                  <CommandGroup heading={`${group.label} · ${assets.length}`}>
-                    {assets.map((asset) => (
+                  <CommandGroup heading={`${group.label} · ${groupedAssets.length}`}>
+                    {groupedAssets.map((asset) => (
                       <CommandItem
                         key={asset.symbol}
                         value={`${asset.symbol} ${asset.name} ${asset.sector}`}
                         onSelect={() => { onSelect(asset.symbol); onOpenChange(false); }}
                         className="min-h-12 px-3 data-[selected=true]:bg-primary/[0.06] data-[selected=true]:text-foreground"
                       >
-                        <PairAssetLogo symbol={asset.symbol} size={34} className="border-primary/20" />
+                        <PairAssetLogo symbol={asset.logoKey || asset.symbol} size={34} className="border-primary/20" />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2"><span className="font-mono text-sm font-semibold">{asset.symbol}</span><span className="text-xs text-mutedtext truncate">{asset.name}</span></div>
                           <div className="text-[10px] text-mutedtext mt-0.5">{asset.sector}</div>
@@ -584,7 +589,7 @@ function PairDialog({ open, onOpenChange, selected, onSelect }) {
             })}
           </CommandList>
           <div className="px-5 py-3 border-t border-border flex items-center justify-between text-[10px] tracking-[0.1em] text-mutedtext">
-            <span>PROTOTYPE CATALOG</span><span className="text-primary">DYNAMIC IN PRODUCTION</span>
+            <span>{status === "loading" ? "SYNCING ONCHAIN CATALOG" : status === "error" ? "CATALOG UNAVAILABLE" : `CATALOG VERSION ${version || "—"}`}</span><span className="text-primary">SERVER VERIFIED</span>
           </div>
         </Command>
       </DialogContent>

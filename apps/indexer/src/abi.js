@@ -13,6 +13,7 @@ export const protocolAbi = parseAbi([
   "event RewardClaimed(address indexed recipient, address indexed currency, uint256 amount)",
   "event ZapBuy(bytes32 indexed poolId, address indexed buyer, uint256 ethIn, uint256 tokensOut)",
   "event ZapSell(bytes32 indexed poolId, address indexed seller, uint256 tokensIn, uint256 ethOut)",
+  "event PairAssetUpdated(address indexed asset, uint8 indexed pairType, bool enabled, uint8 decimals, uint64 configVersion)",
 ]);
 
 export const swapEvent = parseAbiItem("event Swap(bytes32 indexed id, address indexed sender, int128 amount0, int128 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick, uint24 fee)");
@@ -36,6 +37,10 @@ export const feeEscrowViewAbi = parseAbi([
 
 export const factoryViewAbi = parseAbi([
   "function getLaunchedToken(address token) view returns ((address token,address deployer,address creatorFeeRecipient,address pairToken,uint256 phantomQuote,uint24 poolFee,int24 tickSpacing,int24 tickLower,int24 tickUpper,uint128 liquidity,uint256 positionId,uint16 baseFeeBps,uint16 creatorTaxBps,uint16 protocolFeeShareBps,address protocolFeeRecipient,uint64 launchedAt,bool exists))",
+]);
+
+export const pairRegistryViewAbi = parseAbi([
+  "function getPair(address asset) view returns ((bool registered,bool enabled,uint8 pairType,uint8 decimals,uint64 updatedAt,uint64 configVersion))",
 ]);
 
 export const lockerKeeperAbi = parseAbi([

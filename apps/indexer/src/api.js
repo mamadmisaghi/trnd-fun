@@ -1,4 +1,5 @@
 import http from "node:http";
+import { buildRouteDescriptor, normalizeRouteAllowlist, publicPair } from "./route-policy.js";
 
 const addressPattern = /^0x[0-9a-fA-F]{40}$/;
 const intervals = new Map([["1m", 60], ["5m", 300], ["15m", 900], ["1h", 3_600], ["1d", 86_400]]);
@@ -42,6 +43,18 @@ const marketSelect = `
   ) holders ON true`;
 
 export function startApi(config, db, eventHub, indexer = null) {
+  const configuredRoutePolicy = config.routePolicy || {
+    quoteTtlSeconds: 30,
+    maximumSlippageBps: 300,
+    maximumPriceImpactBps: 1_000,
+    allowlist: [],
+  };
+  const routeAllowlist = normalizeRouteAllowlist(configuredRoutePolicy.allowlist || [], {
+    chainId: config.chainId,
+    wrappedNative: configuredRoutePolicy.wrappedNative,
+    adapter: configuredRoutePolicy.adapter,
+  });
+  const routesByAsset = new Map(routeAllowlist.map((entry) => [entry.asset, entry]));
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
     if (req.method === "OPTIONS") {
@@ -88,6 +101,37 @@ export function startApi(config, db, eventHub, indexer = null) {
       if (url.pathname === "/v1/markets") {
         const rows = await db.query(`${marketSelect} WHERE l.chain_id=$1 ORDER BY l.block_number DESC,l.log_index DESC LIMIT $2`, [config.chainId, limitOf(url)]);
         return send(res, 200, { data: rows.rows }, config.corsOrigin);
+      }
+      if (url.pathname === "/v1/pairs") {
+        const rows = await db.query(
+          `SELECT * FROM pair_assets WHERE chain_id=$1 ORDER BY config_version DESC`,
+          [config.chainId],
+        );
+        const catalog = rows.rows
+          .map((row) => publicPair(row, routesByAsset.get(row.asset_address)))
+          .filter((pair) => pair.enabled);
+        return send(res, 200, {
+          data: catalog,
+          catalogVersion: catalog.reduce((maximum, pair) => BigInt(pair.configVersion) > maximum ? BigInt(pair.configVersion) : maximum, 0n).toString(),
+          policy: {
+            serverControlled: true,
+            quoteTtlSeconds: configuredRoutePolicy.quoteTtlSeconds,
+            maximumSlippageBps: configuredRoutePolicy.maximumSlippageBps,
+            maximumPriceImpactBps: configuredRoutePolicy.maximumPriceImpactBps,
+          },
+        }, config.corsOrigin);
+      }
+      const routeMatch = url.pathname.match(/^\/v1\/routes\/eth\/(0x[0-9a-fA-F]{40})$/);
+      if (routeMatch) {
+        const asset = routeMatch[1].toLowerCase();
+        const direction = url.searchParams.get("direction") || "buy";
+        if (!["buy", "sell"].includes(direction)) return send(res, 400, { error: "invalid_direction" }, config.corsOrigin);
+        const rows = await db.query(`SELECT * FROM pair_assets WHERE chain_id=$1 AND asset_address=$2`, [config.chainId, asset]);
+        if (!rows.rowCount) return send(res, 404, { error: "pair_not_registered" }, config.corsOrigin);
+        const route = routesByAsset.get(asset);
+        const pair = publicPair(rows.rows[0], route);
+        if (!pair.enabled) return send(res, 422, { error: "pair_not_routable" }, config.corsOrigin);
+        return send(res, 200, { pair, route: buildRouteDescriptor(route, direction, configuredRoutePolicy) }, config.corsOrigin);
       }
       const market = tokenFrom(url.pathname);
       if (market) {

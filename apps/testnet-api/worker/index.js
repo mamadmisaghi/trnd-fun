@@ -5,6 +5,9 @@ const RPC_URLS = [
 const CHAIN_ID = 46630;
 const FACTORY = "0x8D196Fc239AE5C364eF4E8b76A987Acd6065929C";
 const POOL_MANAGER = "0x8366a39CC670B4001A1121B8F6A443A643e40951";
+const PAIR_REGISTRY = "0x8e84B45d98A2b8233Aa1bA8BB16b6678E1C947aa";
+const WRAPPED_ETH = "0x78a01a9b91ad157867ffcaf9b93c38dd83221976";
+const TESTNET_ADAPTER = "0xcc4375d3ff3a8048bdd50c1500593cf395f7ac68";
 const FACTORY_DEPLOY_TX = "0xf2c907e57fb639554d1caa94ed02e54cf0a18c17d061d001e62978b96cf44982";
 const TOPICS = {
   launch: "0xb6c7b1c782b79bdb5091830e037f9ebc94bdc6e5b07b5cff47220272a2b360e8",
@@ -15,6 +18,13 @@ const PAIRS = {
   "0x20a887523fbbf0024eb46ee672df15a95521e680": "USDG",
   "0xc9f9c86933092bbbfff3ccb4b105a4a94bf3bd4e": "TSLA",
 };
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const PAIR_POLICY = {
+  [ZERO_ADDRESS]: { name: "Ether", symbol: "ETH", type: "NATIVE", decimals: 18, logoKey: "ETH", kind: "native", transferBehavior: "native" },
+  "0x20a887523fbbf0024eb46ee672df15a95521e680": { name: "Test Global Dollar", symbol: "USDG", type: "STABLE", decimals: 6, logoKey: "USDG", kind: "testnet_fixed_adapter", fee: 500, transferBehavior: "standard" },
+  "0xc9f9c86933092bbbfff3ccb4b105a4a94bf3bd4e": { name: "Tesla Testnet Stock Token", symbol: "TSLA", type: "STOCK", decimals: 18, logoKey: "TSLA", kind: "testnet_fixed_adapter", fee: 500, transferBehavior: "standard" },
+};
+const ROUTE_POLICY = { quoteTtlSeconds: 30, maximumSlippageBps: 300, maximumPriceImpactBps: 1000 };
 
 const json = (value, status = 200) => new Response(JSON.stringify(value, (_, item) => typeof item === "bigint" ? item.toString() : item), {
   status,
@@ -61,6 +71,81 @@ function decodeText(result) {
 async function tokenText(token, selector) {
   try { return decodeText(await rpc("eth_call", [{ to: token, data: selector }, "latest"])); }
   catch { return null; }
+}
+
+async function pairConfig(asset) {
+  const argument = asset.slice(2).padStart(64, "0");
+  const result = await rpc("eth_call", [{ to: PAIR_REGISTRY, data: `0x1a788a02${argument}` }, "latest"]);
+  const decoded = words(result);
+  if (decoded.length < 6) throw new Error("Pair registry returned an invalid response");
+  return {
+    registered: BigInt(`0x${decoded[0]}`) !== 0n,
+    enabled: BigInt(`0x${decoded[1]}`) !== 0n,
+    pairType: Number(BigInt(`0x${decoded[2]}`)),
+    decimals: Number(BigInt(`0x${decoded[3]}`)),
+    updatedAt: Number(BigInt(`0x${decoded[4]}`)),
+    configVersion: BigInt(`0x${decoded[5]}`).toString(),
+  };
+}
+
+async function tokenDecimals(token) {
+  const result = await rpc("eth_call", [{ to: token, data: "0x313ce567" }, "latest"]);
+  return Number(BigInt(result));
+}
+
+async function livePair(asset, policy) {
+  const config = await pairConfig(asset);
+  const [name, symbol, decimals] = asset === ZERO_ADDRESS
+    ? ["Ether", "ETH", 18]
+    : await Promise.all([tokenText(asset, "0x06fdde03"), tokenText(asset, "0x95d89b41"), tokenDecimals(asset)]);
+  const metadataValid = Boolean(name && symbol)
+    && symbol.toUpperCase() === policy.symbol
+    && decimals === config.decimals
+    && decimals === policy.decimals;
+  return {
+    address: asset,
+    name,
+    symbol,
+    decimals: config.decimals,
+    type: ["NATIVE", "STABLE", "STOCK"][config.pairType] || "UNKNOWN",
+    configVersion: config.configVersion,
+    updatedAt: new Date(config.updatedAt * 1000).toISOString(),
+    metadataValid,
+    logoKey: policy.logoKey,
+    enabled: Boolean(config.registered && config.enabled && metadataValid),
+    route: { kind: policy.kind, testnetOnly: true, transferBehavior: policy.transferBehavior },
+  };
+}
+
+async function pairCatalog() {
+  const entries = await Promise.all(Object.entries(PAIR_POLICY).map(async ([asset, policy]) => livePair(asset, policy)));
+  return entries.filter((pair) => pair.enabled);
+}
+
+function v3Path(tokenIn, tokenOut, fee) {
+  return `0x${tokenIn.slice(2)}${Number(fee).toString(16).padStart(6, "0")}${tokenOut.slice(2)}`;
+}
+
+function routeDescriptor(asset, policy, direction) {
+  const now = Date.now();
+  return {
+    asset,
+    direction,
+    kind: policy.kind,
+    testnetOnly: true,
+    transferBehavior: policy.transferBehavior,
+    issuedAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + ROUTE_POLICY.quoteTtlSeconds * 1000).toISOString(),
+    ttlSeconds: ROUTE_POLICY.quoteTtlSeconds,
+    maximumSlippageBps: ROUTE_POLICY.maximumSlippageBps,
+    maximumPriceImpactBps: ROUTE_POLICY.maximumPriceImpactBps,
+    requiresFreshSimulation: true,
+    adapter: asset === ZERO_ADDRESS ? null : TESTNET_ADAPTER,
+    leg: asset === ZERO_ADDRESS ? { v3Path: "0x", v4Hops: [] } : {
+      v3Path: v3Path(direction === "buy" ? WRAPPED_ETH : asset, direction === "buy" ? asset : WRAPPED_ETH, policy.fee),
+      v4Hops: [],
+    },
+  };
 }
 
 async function ensureState(db) {
@@ -155,12 +240,31 @@ async function handle(request, env, ctx) {
   if (!env.DB) return json({ error: "Database binding unavailable" }, 503);
   const url = new URL(request.url);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type" } });
-  if (url.pathname === "/") return json({ service: "ViralTerminal Testnet Indexer", chainId: CHAIN_ID, endpoints: ["/health", "/sync", "/v1/ingest", "/v1/markets", "/v1/markets/:token", "/v1/markets/:token/trades"] });
+  if (url.pathname === "/") return json({ service: "TRND.fun Testnet API", chainId: CHAIN_ID, endpoints: ["/health", "/sync", "/v1/ingest", "/v1/pairs", "/v1/routes/eth/:pair", "/v1/markets", "/v1/markets/:token", "/v1/markets/:token/trades"] });
   if (url.pathname === "/health") {
     const state = await env.DB.prepare("SELECT * FROM indexer_state WHERE chain_id=?").bind(CHAIN_ID).first();
     return json({ ok: true, chainId: CHAIN_ID, state });
   }
   if (url.pathname === "/sync") return json(await sync(env.DB, Number(url.searchParams.get("batches") || 8)));
+  if (url.pathname === "/v1/pairs") {
+    const data = await pairCatalog();
+    return json({
+      data,
+      catalogVersion: data.reduce((maximum, pair) => BigInt(pair.configVersion) > maximum ? BigInt(pair.configVersion) : maximum, 0n).toString(),
+      policy: { ...ROUTE_POLICY, serverControlled: true },
+    });
+  }
+  const routeMatch = url.pathname.match(/^\/v1\/routes\/eth\/(0x[a-fA-F0-9]{40})$/);
+  if (routeMatch) {
+    const asset = routeMatch[1].toLowerCase();
+    const direction = url.searchParams.get("direction") || "buy";
+    if (!["buy", "sell"].includes(direction)) return json({ error: "invalid_direction" }, 400);
+    const policy = PAIR_POLICY[asset];
+    if (!policy) return json({ error: "route_not_allowed" }, 404);
+    const pair = await livePair(asset, policy);
+    if (!pair.enabled) return json({ error: "pair_not_routable" }, 422);
+    return json({ pair, route: routeDescriptor(asset, policy, direction) });
+  }
   if (url.pathname === "/v1/ingest" && request.method === "POST") {
     const body = await request.json();
     return json(await ingestTransaction(env.DB, body.transactionHash));

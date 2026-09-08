@@ -70,3 +70,51 @@ test("readiness reports confirmed lag and fails closed above its threshold", asy
     server.close();
   }
 });
+
+test("pair catalog and route policy expose only registry-confirmed allowlisted assets", async () => {
+  const pair = "0x2000000000000000000000000000000000000000";
+  const db = {
+    async query(text) {
+      if (text.includes("pair_assets")) return { rows: [{
+        asset_address: pair,
+        registered: true,
+        enabled: true,
+        pair_type: 2,
+        decimals: 18,
+        config_version: "4",
+        token_name: "Test Stock",
+        token_symbol: "TEST",
+        metadata_valid: true,
+      }], rowCount: 1 };
+      return { rows: [], rowCount: 0 };
+    },
+  };
+  const config = {
+    apiPort: 0,
+    chainId: 46_630,
+    corsOrigin: "http://localhost:3000",
+    routePolicy: {
+      quoteTtlSeconds: 30,
+      maximumSlippageBps: 300,
+      maximumPriceImpactBps: 1_000,
+      wrappedNative: "0x1000000000000000000000000000000000000000",
+      adapter: "0x3000000000000000000000000000000000000000",
+      allowlist: [{ asset: pair, kind: "testnet_fixed_adapter", fee: 500, transferBehavior: "standard", expectedSymbol: "TEST", expectedDecimals: 18, logoKey: "TEST" }],
+    },
+  };
+  const server = startApi(config, db, createEventHub());
+  await once(server, "listening");
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const catalog = await fetch(`${base}/v1/pairs`).then((response) => response.json());
+    assert.equal(catalog.catalogVersion, "4");
+    assert.equal(catalog.data[0].symbol, "TEST");
+    assert.equal(catalog.data[0].enabled, true);
+    const routed = await fetch(`${base}/v1/routes/eth/${pair}?direction=buy`).then((response) => response.json());
+    assert.equal(routed.route.asset, pair);
+    assert.equal(routed.route.requiresFreshSimulation, true);
+    assert.match(routed.route.leg.v3Path, /^0x[0-9a-f]+$/);
+  } finally {
+    server.close();
+  }
+});

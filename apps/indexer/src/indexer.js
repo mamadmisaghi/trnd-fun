@@ -60,6 +60,34 @@ export function createIndexer(config, db, eventHub, logger = console, dependenci
        ) movements GROUP BY chain_id,token_address,holder_address HAVING sum(delta)>=0`,
       [config.chainId, ZERO],
     );
+    await tx.query(
+      `DELETE FROM pair_assets p
+       WHERE p.chain_id=$1 AND NOT EXISTS (
+         SELECT 1 FROM raw_events r
+         WHERE r.chain_id=p.chain_id AND r.event_name='PairAssetUpdated'
+           AND lower(r.event_args->>'asset')=p.asset_address
+       )`,
+      [config.chainId],
+    );
+    await tx.query(
+      `WITH latest AS (
+         SELECT DISTINCT ON (lower(event_args->>'asset'))
+           lower(event_args->>'asset') asset_address,
+           (event_args->>'enabled')::boolean enabled,
+           (event_args->>'pairType')::integer pair_type,
+           (event_args->>'decimals')::integer decimals,
+           (event_args->>'configVersion')::numeric config_version,
+           block_number,transaction_hash,log_index
+         FROM raw_events
+         WHERE chain_id=$1 AND event_name='PairAssetUpdated'
+         ORDER BY lower(event_args->>'asset'),block_number DESC,log_index DESC
+       )
+       UPDATE pair_assets p SET enabled=l.enabled,pair_type=l.pair_type,decimals=l.decimals,
+         config_version=l.config_version,block_number=l.block_number,transaction_hash=l.transaction_hash,
+         log_index=l.log_index,updated_at=now()
+       FROM latest l WHERE p.chain_id=$1 AND p.asset_address=l.asset_address`,
+      [config.chainId],
+    );
   }
 
   async function reconcileReorg(current) {
@@ -126,7 +154,7 @@ export function createIndexer(config, db, eventHub, logger = console, dependenci
   }
 
   async function ingestRange(fromBlock, toBlock) {
-    const addresses = [config.contracts.factory, config.contracts.router, config.contracts.locker, config.contracts.feeEscrow, config.contracts.feeSplitter, config.contracts.rewardVault].filter(Boolean);
+    const addresses = [config.contracts.factory, config.contracts.router, config.contracts.locker, config.contracts.feeEscrow, config.contracts.feeSplitter, config.contracts.rewardVault, config.contracts.pairRegistry].filter(Boolean);
     const [protocolLogs, swapLogs, launches] = await Promise.all([
       client.getLogs({ address: addresses, fromBlock, toBlock }),
       client.getLogs({ address: config.contracts.poolManager, event: swapEvent, fromBlock, toBlock }),
@@ -143,6 +171,7 @@ export function createIndexer(config, db, eventHub, logger = console, dependenci
     const pools = new Map(launches.rows.map((row) => [lower(row.pool_id), { token: lower(row.token_address), pair: lower(row.pair_token), tokenDecimals: row.token_decimals, pairDecimals: row.pair_decimals }]));
     const tracked = new Set(trackedTokens);
     const changed = new Set();
+    const pairChanges = [];
 
     await db.transaction(async (tx) => {
       for (const block of blocks.values()) {
@@ -169,6 +198,31 @@ export function createIndexer(config, db, eventHub, logger = console, dependenci
           pools.set(lower(args.poolId), { token: lower(args.token), pair: lower(args.pairToken), tokenDecimals: data.token.decimals, pairDecimals: data.pair.decimals });
           tracked.add(lower(args.token));
           changed.add(lower(args.token));
+        } else if (eventName === "PairAssetUpdated") {
+          let pairData;
+          let metadataError = null;
+          try {
+            pairData = lower(args.asset) === ZERO
+              ? { name: "Ether", symbol: "ETH", decimals: 18 }
+              : await metadata(args.asset);
+          } catch (error) {
+            metadataError = String(error?.shortMessage || error?.message || "metadata read failed").slice(0, 500);
+            pairData = { name: null, symbol: null, decimals: Number(args.decimals) };
+          }
+          const metadataValid = !metadataError
+            && Boolean(pairData.name && pairData.symbol)
+            && Number(pairData.decimals) === Number(args.decimals);
+          if (!metadataValid && !metadataError) metadataError = "registry decimals do not match token metadata";
+          await tx.query(
+            `INSERT INTO pair_assets(chain_id,asset_address,registered,enabled,pair_type,decimals,config_version,token_name,token_symbol,metadata_valid,metadata_error,block_number,transaction_hash,log_index)
+             VALUES($1,$2,true,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+             ON CONFLICT(chain_id,asset_address) DO UPDATE SET registered=true,enabled=excluded.enabled,pair_type=excluded.pair_type,
+               decimals=excluded.decimals,config_version=excluded.config_version,token_name=excluded.token_name,
+               token_symbol=excluded.token_symbol,metadata_valid=excluded.metadata_valid,metadata_error=excluded.metadata_error,
+               block_number=excluded.block_number,transaction_hash=excluded.transaction_hash,log_index=excluded.log_index,updated_at=now()`,
+            [config.chainId, lower(args.asset), Boolean(args.enabled), Number(args.pairType), Number(args.decimals), args.configVersion.toString(), pairData.name, pairData.symbol, metadataValid, metadataError, log.blockNumber.toString(), log.transactionHash, log.logIndex],
+          );
+          pairChanges.push({ assetAddress: lower(args.asset), configVersion: args.configVersion.toString() });
         } else if (eventName === "LaunchPositionMinted") {
           await tx.query(`UPDATE launches SET position_id=$3,tick_lower=$4,tick_upper=$5,liquidity=$6,token_amount=$7,phantom_quote=$8 WHERE chain_id=$1 AND token_address=$2`, [config.chainId, lower(args.token), args.positionId.toString(), Number(args.tickLower), Number(args.tickUpper), args.liquidity.toString(), args.tokenAmount.toString(), args.phantomQuote.toString()]);
           changed.add(lower(args.token));
@@ -206,6 +260,7 @@ export function createIndexer(config, db, eventHub, logger = console, dependenci
       await tx.query(`UPDATE indexer_state SET cursor_block=$2,cursor_block_hash=$3,updated_at=now() WHERE chain_id=$1`, [config.chainId, toBlock.toString(), checkpoint.hash]);
     });
     for (const tokenAddress of changed) eventHub?.publish({ type: "market.updated", chainId: config.chainId, tokenAddress, blockNumber: toBlock.toString(), confirmed: true });
+    for (const pair of pairChanges) eventHub?.publish({ type: "pair.updated", chainId: config.chainId, ...pair, blockNumber: toBlock.toString(), confirmed: true });
     return events.length;
   }
 
